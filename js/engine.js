@@ -39,8 +39,19 @@
     TILES["C"] = mk((g, p) => { p(0, 0, "#e6cfa1", 16, 16); p(0, 4, "#c0d8f0", 16, 10); p(0, 4, "#ffffff", 16, 2); p(0, 13, "#8090a0", 16, 2); });
     TILES["X"] = mk((g, p) => { p(0, 0, "#e6cfa1", 16, 16); p(2, 4, "#c03030", 12, 10); p(3, 5, "#e05050", 10, 8); });
     TILES[" "] = mk((g, p) => p(0, 0, "#000", 16, 16));
+    // 동굴/협곡/탑/호수 타일
+    TILES["K"] = mk((g, p) => { p(0, 0, "#4a3c34", 16, 16); p(1, 2, "#7a6a5a", 9, 6); p(8, 8, "#6a5a4c", 7, 6); p(2, 3, "#9a8a76", 4, 2); p(9, 9, "#8a7a68", 3, 2); p(0, 15, "#2a201a", 16, 1); });
+    TILES[";"] = mk((g, p) => { p(0, 0, "#5a4a42", 16, 16); [[3, 4], [11, 2], [7, 10], [13, 13], [2, 12]].forEach(([x, y]) => p(x, y, "#6c5a50", 2, 1)); });
+    TILES[":"] = mk((g, p) => { p(0, 0, "#4c3e38", 16, 16); [[2, 3], [9, 5], [5, 11], [12, 12], [13, 1]].forEach(([x, y]) => { p(x, y, "#8a7868", 2, 2); p(x, y + 2, "#2e2420", 2, 1); }); p(7, 2, "#60d0e0"); p(3, 8, "#60d0e0"); });
+    TILES["G"] = mk((g, p) => { p(0, 0, "#d8a070", 16, 16); [[3, 2], [10, 6], [5, 12], [13, 11]].forEach(([x, y]) => p(x, y, "#c08858", 2, 1)); });
+    TILES["v"] = mk((g, p) => { p(0, 0, "#d8a070", 16, 16); for (let y = 1; y < 16; y += 5) for (let x = (y % 2) * 2; x < 16; x += 4) { p(x, y + 2, "#9a7a30"); p(x + 1, y + 1, "#b89a40"); p(x + 2, y + 2, "#9a7a30"); p(x + 1, y + 2, "#c8aa50"); p(x + 1, y + 3, "#9a7a30"); } });
+    TILES["Y"] = mk((g, p) => { p(0, 0, "#b8b0c8", 16, 16); p(0, 7, "#9890a8", 16, 1); p(0, 15, "#9890a8", 16, 1); p(7, 0, "#9890a8", 1, 7); p(3, 8, "#9890a8", 1, 7); p(11, 8, "#9890a8", 1, 7); });
+    TILES["Q"] = mk((g, p) => { p(0, 0, "#585070", 16, 16); p(0, 0, "#706890", 16, 4); p(0, 7, "#403858", 16, 1); p(0, 12, "#403858", 16, 1); p(5, 7, "#403858", 1, 5); p(11, 12, "#403858", 1, 4); });
+    TILES["Z"] = mk((g, p) => { p(0, 0, "#f0e0a8", 16, 16); [[3, 3], [10, 7], [6, 12], [13, 2]].forEach(([x, y]) => p(x, y, "#d8c890", 1, 1)); });
+    TILES["*"] = mk((g, p) => { p(0, 0, "#4c3e38", 16, 16); p(5, 3, "#60d0e0", 6, 10); p(6, 1, "#a0f0ff", 4, 4); p(4, 8, "#40a0c0", 2, 5); p(10, 6, "#40a0c0", 2, 7); p(7, 4, "#fff", 1, 3); });
   }
-  const SOLID = new Set(["T", "~", "R", "U", "O", "P", "H", "W", "B", "M", "C", "S", "#", " "]);
+  const SOLID = new Set(["T", "~", "R", "U", "O", "P", "H", "W", "B", "M", "C", "S", "#", " ", "K", "Q", "*"]);
+  const ENC_TILES = new Set([",", ":", "v"]);
 
   /* ---------------- 캐릭터 스프라이트 ---------------- */
   function drawPerson(g, x, y, dir, step, look) {
@@ -70,7 +81,8 @@
   const monCache = {};
   function monSprite(id) {
     if (monCache[id]) return monCache[id];
-    const m = S.MONSTERS[id]; let seed = m.seed * 9301 + 49297;
+    const m = S.MONSTERS[id];
+    if (m.ltssm && window.LUI) return (monCache[id] = window.LUI.monSprite(m)); let seed = m.seed * 9301 + 49297;
     const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
     const N = 20, H = 10; let grid = [];
     for (let y = 0; y < N; y++) { grid[y] = []; for (let x = 0; x < H; x++) { const dx = (H - x) / H, dy = Math.abs(y - N * 0.55) / (N / 2); const pr = 0.85 - dy * 0.7 - (1 - dx) * 0.5; grid[y][x] = rand() < pr ? 1 : 0; } }
@@ -98,7 +110,8 @@
   const SAVE_KEY = "specrpg_save_v1";
   function newState() {
     return { map: "lab", x: 4, y: 6, dir: "up", lv: 1, xp: 0, hp: 30, chapter: 1, ltssm: "Detect", gen: 1, width: 1,
-      flags: {}, items: {}, learned: {}, mastery: {}, moves: [], badges: [], seenQ: {}, wins: 0, playMs: 0 };
+      flags: {}, items: {}, learned: {}, mastery: {}, moves: [], badges: [], seenQ: {}, wins: 0, playMs: 0,
+      ver: 2, sbadges: [], rules: {}, ach: [], met: [], st: { cs: 0, bs: 0, pf: 0 }, title: "" };
   }
   G.P = () => P;
   const maxHP = () => 30 + 6 * (P.lv - 1);
@@ -109,10 +122,10 @@
   G.hasItem = (k) => (P.items[k] || 0) > 0;
   G.save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); } catch (e) {} };
   G.hasSave = () => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };
-  G.load = () => { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); P = Object.assign(newState(), s); return true; } catch (e) { return false; } };
+  G.load = () => { try { let s = JSON.parse(localStorage.getItem(SAVE_KEY)); const r = S.LTSSM.migrate(s); s = r.P; P = Object.assign(newState(), s); P.st = Object.assign({ cs: 0, bs: 0, pf: 0 }, P.st); G.justMigrated = r.migrated; return true; } catch (e) { return false; } };
   G.newGame = () => { P = newState(); };
   G.newState = newState;
-  G.setState = (s) => { P = Object.assign(newState(), s); P.hp = Math.min(P.hp, maxHP()); mv = null; };
+  G.setState = (s) => { P = Object.assign(newState(), s); P.st = Object.assign({ cs: 0, bs: 0, pf: 0 }, P.st); P.hp = Math.min(P.hp, maxHP()); mv = null; };
   G.setHandler = (h) => { handler = h; };
 
   /* ---------------- 입력 ---------------- */
@@ -140,13 +153,21 @@
   const heldDir = () => (lastDir && held[lastDir] ? lastDir : ["up", "down", "left", "right"].find((d) => held[d]) || null);
 
   /* ---------------- 대화 / 선택 UI ---------------- */
-  function clearConsole() { elText.textContent = ""; elList.innerHTML = ""; elList.className = ""; elName.textContent = ""; elArrow.classList.remove("on"); }
+  function clearConsole() { elText.textContent = ""; elList.innerHTML = ""; elList.className = ""; elName.textContent = ""; elArrow.classList.remove("on"); elConsole.style.fontSize = ""; elConsole.scrollTop = 0; }
+  /* fitConsole: 내용이 넘치면 글자 크기를 단계적으로 줄여 스크롤 없이 보이게 (최소 11px) */
+  function fitConsole() {
+    elConsole.style.fontSize = ""; elConsole.scrollTop = 0;
+    let fs = parseFloat(getComputedStyle(elConsole).fontSize) || 15;
+    while (elConsole.scrollHeight > elConsole.clientHeight + 1 && fs > 11) { fs -= 0.5; elConsole.style.fontSize = fs + "px"; }
+    elConsole.scrollTop = 0;
+  }
+  G.fitConsole = fitConsole;
   G.clearConsole = clearConsole;
   function typeLine(text) {
     return new Promise((resolve) => {
-      let i = 0, done = false; elText.textContent = ""; elArrow.classList.remove("on");
+      let i = 0, done = false; elText.textContent = ""; elArrow.classList.remove("on"); elConsole.style.fontSize = ""; elConsole.scrollTop = 0;
       const timer = setInterval(() => { i += 2; elText.textContent = text.slice(0, i); elConsole.scrollTop = elConsole.scrollHeight; if (i >= text.length) finish(); }, 28);
-      function finish() { clearInterval(timer); elText.textContent = text; done = true; elArrow.classList.add("on"); }
+      function finish() { clearInterval(timer); elText.textContent = text; done = true; elArrow.classList.add("on"); if (G.mode === "battle") { fitConsole(); elConsole.scrollTop = elConsole.scrollHeight; } }
       handler = (b) => { if (b !== "A" && b !== "B") return; if (!done) finish(); else { handler = null; elArrow.classList.remove("on"); resolve(); } };
     });
   }
@@ -158,15 +179,23 @@
   /* choose: 목록 선택. opts: {prompt, cancel, grid, disabled:Set, hint:(i)=>text, header} → index (-1 = 취소) */
   G.choose = function (options, opts = {}) {
     return new Promise((resolve) => {
-      elName.textContent = opts.name || "";
+      elName.textContent = opts.name || ""; elConsole.style.fontSize = ""; elConsole.scrollTop = 0;
       elText.innerHTML = ""; if (opts.header) { const h = document.createElement("div"); h.className = "hdr"; h.textContent = opts.header; elText.appendChild(h); }
-      if (opts.prompt) elText.appendChild(document.createTextNode(opts.prompt));
-      elArrow.classList.remove("on"); elList.innerHTML = ""; elList.className = opts.grid ? "grid" : "";
+      if (opts.prompt) { const q = document.createElement("div"); q.className = opts.quiz ? "qtext" : ""; q.textContent = opts.prompt; elText.appendChild(q); }
+      if (opts.sub) { const h = document.createElement("div"); h.className = "qsub"; h.innerHTML = opts.sub; elText.appendChild(h); }
+      elArrow.classList.remove("on"); elList.innerHTML = ""; elList.className = (opts.grid ? "grid" : "") + (opts.quiz ? " quiz" : "");
       const dis = opts.disabled || new Set(); let cur = 0; while (dis.has(cur) && cur < options.length - 1) cur++;
       const els = options.map((o, i) => { const d = document.createElement("div"); d.className = "opt" + (dis.has(i) ? " off" : ""); d.textContent = o;
         d.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); if (dis.has(i)) return; cur = i; render(); finish(i); }); elList.appendChild(d); return d; });
       const hintEl = document.createElement("div"); hintEl.className = "hdr"; hintEl.style.marginTop = "4px"; if (opts.hint) elList.after ? null : null;
-      function render() { els.forEach((e, i) => e.classList.toggle("sel", i === cur)); if (opts.hint) { hintEl.textContent = opts.hint(cur) || ""; elList.appendChild(hintEl); } els[cur] && els[cur].scrollIntoView({ block: "nearest" }); }
+      let first = true;
+      function render() {
+        els.forEach((e, i) => e.classList.toggle("sel", i === cur)); if (opts.hint) { hintEl.textContent = opts.hint(cur) || ""; elList.appendChild(hintEl); }
+        // 버그 수정: 첫 렌더에서 scrollIntoView 금지(질문이 위로 밀려 안 보이던 원인). 퀴즈는 항상 맨 위 고정.
+        if (opts.quiz || G.mode === "battle") { if (first) fitConsole(); elConsole.scrollTop = 0; }
+        else if (!first && els[cur]) { const r = els[cur].getBoundingClientRect(), c = elConsole.getBoundingClientRect(); if (r.bottom > c.bottom || r.top < c.top) els[cur].scrollIntoView({ block: "nearest" }); }
+        first = false;
+      }
       function finish(i) { handler = null; resolve(i); }
       render();
       handler = (b) => {
@@ -184,12 +213,17 @@
       elPanel.classList.remove("hidden"); elPTitle.textContent = title; elPList.innerHTML = "";
       const selectable = items.map((it, i) => (it.sec ? -1 : i)).filter((i) => i >= 0);
       let cur = opts.start != null ? Math.max(0, selectable.indexOf(opts.start)) : 0;
-      const els = items.map((it, i) => { const d = document.createElement("div"); d.className = "it" + (it.sec ? " sec" : "") + (it.lock ? " lock" : ""); d.textContent = it.label;
+      elPList.className = opts.cols ? "cols c" + opts.cols : "";
+      const els = items.map((it, i) => { const d = document.createElement("div"); d.className = "it" + (it.sec ? " sec" : "") + (it.lock ? " lock" : "") + (it.cls ? " " + it.cls : "");
+        if (it.icon) { const im = document.createElement("img"); im.src = it.icon; im.className = "ico"; d.appendChild(im); }
+        const sp = document.createElement("span"); sp.className = "lb"; sp.textContent = it.label; d.appendChild(sp);
+        if (it.bar != null) { const b = document.createElement("div"); b.className = "bar"; const f = document.createElement("i"); f.style.width = Math.round(Math.max(0, Math.min(1, it.bar)) * 100) + "%"; b.appendChild(f); d.appendChild(b); }
         if (!it.sec) d.addEventListener("pointerdown", (e) => { e.preventDefault(); const k = selectable.indexOf(i); if (k === cur && opts.selectable) { done(i); return; } cur = k; render(); }); elPList.appendChild(d); return d; });
       function render() { els.forEach((e) => e.classList.remove("sel")); const i = selectable[cur]; if (i == null) { clearConsole(); elText.textContent = opts.empty || ""; return; } els[i].classList.add("sel"); els[i].scrollIntoView({ block: "nearest" }); clearConsole(); elText.textContent = items[i].desc || ""; elArrow.classList.remove("on"); }
       function done(i) { handler = null; elPanel.classList.add("hidden"); clearConsole(); resolve(i); }
       render();
-      handler = (b) => { if (b === "up" && selectable.length) { cur = (cur - 1 + selectable.length) % selectable.length; render(); } else if (b === "down" && selectable.length) { cur = (cur + 1) % selectable.length; render(); } else if (b === "A" && opts.selectable && selectable.length) done(selectable[cur]); else if (b === "B" || b === "START" || (b === "A" && !opts.selectable)) done(-1); };
+      const cols = opts.cols || 1, n = () => selectable.length;
+      handler = (b) => { if (cols > 1 && (b === "left" || b === "right") && n()) { cur = (cur + (b === "left" ? -1 : 1) + n()) % n(); render(); } else if (b === "up" && n()) { cur = (cur - cols + n() * cols) % n(); render(); } else if (b === "down" && n()) { cur = (cur + cols) % n(); render(); } else if (b === "A" && opts.selectable && selectable.length) done(selectable[cur]); else if (b === "B" || b === "START" || (b === "A" && !opts.selectable)) done(-1); };
       if (opts.hintAll) { /* no-op */ }
     });
   };
@@ -249,8 +283,10 @@
         if (npcAt(m, x, y)) break;
       }
     }
-    if (tileAt(m, P.x, P.y) === "," && m.encounter && Math.random() < (m.encounter.rate || 0.1)) {
-      const e = m.encounter; const id = e.mons[rnd(e.mons.length)];
+    if (ENC_TILES.has(tileAt(m, P.x, P.y)) && m.encounter && Math.random() < (m.encounter.rate || 0.1)) {
+      const e = m.encounter; let id;
+      if (e.table) { const tot = e.table.reduce((a, [, w]) => a + w, 0); let r = Math.random() * tot; for (const [mid, w] of e.table) { r -= w; if (r <= 0) { id = mid; break; } } id = id || e.table[0][0]; }
+      else id = e.mons[rnd(e.mons.length)];
       await G.battle({ kind: "wild", team: [id], chapters: e.chapters });
     }
   }
@@ -312,7 +348,7 @@
     ctx.fillStyle = "#1b2a1b"; ctx.fillRect(0, 0, 160, 144);
     for (let i = 0; i < 16; i++) { ctx.fillStyle = i % 2 ? "#2c4a2c" : "#244024"; ctx.fillRect(0, 100 + ((i * 7 + animT / 2) % 44), 160, 1); }
     text("SPEC 몬스터", 30, 40, 16, "#f0c040"); text("골드 · PCIe/CXL 편", 40, 56, 9, "#f8f8e8");
-    ctx.drawImage(monSprite("ltssmdragon"), 60, 64);
+    ctx.drawImage(monSprite("ltssmdrake"), 60, 64);
     text("by teslanius", 58, 136, 6, "#88a070", false);
   }
   let lastT = performance.now();
@@ -330,6 +366,14 @@
   }
 
   /* ---------------- 학습 / 성장 ---------------- */
+  const LT = S.LTSSM;
+  const ruleN = (rid) => (P.rules[rid] || 0);
+  const ruleOK = (rid) => ruleN(rid) >= LT.RULE_NEED;
+  const stateOf = (sid) => LT.STATES.find((s) => s.id === sid);
+  const stateDone = (sid) => Object.keys(stateOf(sid).rules).filter(ruleOK).length;
+  const stateTot = (sid) => Object.keys(stateOf(sid).rules).length;
+  const hasSB = (sid) => P.sbadges.includes(sid);
+  G.ruleOK = ruleOK; G.stateDone = stateDone; G.stateTot = stateTot; G.hasSB = hasSB;
   G.learn = async function (ids, silent) {
     if (!Array.isArray(ids)) ids = [ids];
     for (const id of ids) {
@@ -339,78 +383,143 @@
     }
     await G.checkGrowth();
   };
-  const RATE = { 1: "2.5 GT/s · 8b/10b", 2: "5.0 GT/s · 8b/10b", 3: "8.0 GT/s · 128b/130b", 4: "16.0 GT/s · 128b/130b", 5: "32.0 GT/s · 128b/130b", 6: "64.0 GT/s · PAM4 + FLIT" };
+  const RATE = { 1: "2.5 GT/s · 8b/10b", 2: "5.0 GT/s · 8b/10b", 3: "8.0 GT/s · 128b/130b", 4: "16.0 GT/s · 128b/130b", 5: "32.0 GT/s · 128b/130b", 6: "64.0 GT/s · PAM4 1b/1b · FLIT", 7: "128.0 GT/s · PAM4 1b/1b · FLIT" };
   const L = (id) => !!P.learned[id];
   const LT_ORDER = ["Detect", "Polling", "Configuration", "L0"];
   G.setLTSSM = async function (st, msg) { if (LT_ORDER.indexOf(st) <= LT_ORDER.indexOf(P.ltssm)) return; P.ltssm = st; await G.say(msg || `🔗 LTSSM 상태가 ${st}(으)로 전이했다!`); await G.checkGrowth(); };
+  const moveReqText = (m) => m.req ? `「${stateOf(m.req.s).name}」 규칙 ${m.req.n}개 습득` : m.concept ? `「${S.CONCEPTS[m.concept].name}」 개념 학습` : "";
+  const moveReqMet = (m) => m.req ? stateDone(m.req.s) >= m.req.n : m.concept ? L(m.concept) : true;
   G.checkGrowth = async function () {
-    // Link 폭: Configuration 이후 & 개념 학습 필요
+    // LTSSM 진행 = state 배지
+    if (hasSB("det") && P.ltssm === "Detect") await G.setLTSSM("Polling", "🔗 LTSSM: Detect → Polling\n상대 Receiver 감지 완료! 이제 TS1/TS2로 lock을 맞출 차례.");
+    if (hasSB("pol") && P.ltssm === "Polling") await G.setLTSSM("Configuration", "🔗 LTSSM: Polling → Configuration\nbit/symbol lock 성공! Link·Lane 번호를 정하자.");
+    if ((hasSB("cfg") || P.badges.includes("l0")) && P.ltssm !== "L0") await G.setLTSSM("L0", "🔗 LTSSM: Configuration → L0 (2.5 GT/s)\n링크 업! 속도는 Recovery를 거쳐 올린다.");
+    // Link 폭: L0 이후 레벨에 따라
     let w = 1;
-    if (LT_ORDER.indexOf(P.ltssm) >= 2 && L("configuration")) w = P.lv >= 12 ? 16 : P.lv >= 8 ? 8 : P.lv >= 5 ? 4 : P.lv >= 3 ? 2 : 1;
+    if (P.ltssm === "L0") w = P.lv >= 12 ? 16 : P.lv >= 8 ? 8 : P.lv >= 5 ? 4 : P.lv >= 3 ? 2 : 1;
     if (w > P.width) { P.width = w; await G.say(`↔️ Configuration 재협상! Link 폭이 x${w}(으)로 넓어졌다.\n(폭 2배 = 대역폭 2배)`); }
-    // Gen 속도: L0 진입 후, 이해한 개념만큼만 올라감
+    // Gen 속도: Recovery 배지(속도 변경) · Equalization 배지(8 GT/s+) · L0p 배지(Flit) 필요
     let g = 1;
     if (P.ltssm === "L0") {
-      if (P.lv >= 3 && L("gen_speed")) g = 2;
-      if (g >= 2 && P.lv >= 5 && L("equalization") && L("enc_128b130b")) g = 3;
+      const recOK = hasSB("rec") || P.badges.includes("l0"), eqOK = hasSB("eq") || (P.badges.includes("l0") && L("equalization"));
+      if (P.lv >= 3 && recOK) g = 2;
+      if (g >= 2 && P.lv >= 5 && eqOK) g = 3;
       if (g >= 3 && P.lv >= 7) g = 4;
       if (g >= 4 && P.lv >= 9) g = 5;
-      if (g >= 5 && P.lv >= 11 && L("pam4") && L("flit")) g = 6;
+      if (g >= 5 && P.lv >= 11 && (hasSB("l0p") || (L("pam4") && L("flit")))) g = 6;
+      if (g >= 6 && P.lv >= 13 && hasSB("l0p")) g = 7;
     }
     if (g > P.gen) {
       P.gen = g;
-      await G.say([`⚡ Recovery 상태 진입 → Speed Change${g >= 3 ? " + Equalization" : ""}...`, `Link가 Gen${g} (${RATE[g]})(으)로 속도를 올렸다! 공격력 상승!`]);
+      await G.say([`⚡ Recovery.Speed 진입${g >= 3 ? " → Recovery.Equalization" : ""}...`, `Link가 Gen${g} (${RATE[g]})(으)로 속도를 올렸다! 공격력 상승!`]);
     }
-    // 기술 습득: 레벨 + 개념 학습 모두 필요
     for (const mo of S.MOVES) {
       if (P.moves.includes(mo.id)) continue;
-      if (P.lv >= mo.lv && L(mo.concept)) { P.moves.push(mo.id); await G.say(`✨ Link는 새 기술 「${mo.name}」을(를) 익혔다!\n${mo.desc}`); }
+      if (P.lv >= mo.lv && moveReqMet(mo)) { P.moves.push(mo.id); window.LUI && LUI.sfx("rule"); await G.say(`✨ Link는 새 기술 「${mo.name}」을(를) 익혔다!\n${mo.desc}`); }
     }
   };
-  G.gainXP = async function (n) {
-    P.xp += n; await G.say(`경험치 ${n}을(를) 얻었다!`);
-    while (P.xp >= xpNeed(P.lv)) { P.xp -= xpNeed(P.lv); P.lv++; P.hp = Math.min(maxHP(), P.hp + 6); await G.say(`🎉 레벨 업! Lv${P.lv} (최대 HP ${maxHP()})`); }
-    // 레벨은 올랐지만 개념이 부족해 막힌 기술 안내
-    const blocked = S.MOVES.find((m) => !P.moves.includes(m.id) && P.lv >= m.lv && !L(m.concept));
-    await G.checkGrowth();
-    if (blocked && !L(blocked.concept)) await G.say(`💡 「${blocked.name}」을(를) 익힐 레벨이지만, 「${S.CONCEPTS[blocked.concept].name}」 개념을 아직 배우지 못했다.`);
+  G.gainXP = async function (n, note) {
+    P.xp += n; await G.say(`경험치 ${n}을(를) 얻었다!${note ? "\n" + note : ""}`);
+    while (P.xp >= xpNeed(P.lv)) {
+      P.xp -= xpNeed(P.lv); P.lv++; P.hp = Math.min(maxHP(), P.hp + 6);
+      window.LUI && LUI.sfx("levelup"); levelFx();
+      await G.say(`🎉 레벨 업! Lv${P.lv}  (최대 HP ${maxHP()})${P.lv === 10 ? "\n🏟 Lv10! 핵심 배지를 모으면 LTSSM 관장에게 도전할 수 있다." : ""}`);
+    }
+    const blocked = S.MOVES.find((m) => !P.moves.includes(m.id) && P.lv >= m.lv && !moveReqMet(m) && m.req);
+    await G.checkGrowth(); await G.checkAch();
+    if (blocked && !moveReqMet(blocked) && Math.random() < 0.5) await G.say(`💡 「${blocked.name}」: 레벨은 충분! ${moveReqText(blocked)}이 필요하다.`);
   };
+  function levelFx() { const sc = $("screen"); const d = document.createElement("div"); d.className = "lvfx"; d.textContent = "LEVEL UP!"; sc.appendChild(d); setTimeout(() => d.remove(), 1400); }
   G.giveItem = async function (id, n = 1, silent) { P.items[id] = (P.items[id] || 0) + n; if (!silent) await G.say(`🎒 「${S.ITEMS[id].name}」 ×${n}을(를) 받았다!\n${S.ITEMS[id].desc}`); };
   G.heal = () => { P.hp = maxHP(); };
   G.addBadge = (b) => { if (!P.badges.includes(b)) P.badges.push(b); };
 
+  /* 규칙 습득 / state 배지 */
+  async function ruleProgress(rid) {
+    const before = ruleOK(rid); P.rules[rid] = Math.min(99, ruleN(rid) + 1);
+    if (before || !ruleOK(rid)) return;
+    const r = LT.RULES[rid], st = stateOf(r.state);
+    window.LUI && LUI.sfx("rule");
+    window.LUI && LUI.toast(`📜 규칙 습득 <b>${st.name}</b> ${stateDone(st.id)}/${stateTot(st.id)}<br><small>${r.text}</small>`, "rule");
+    if (stateDone(st.id) === stateTot(st.id) && !hasSB(st.id)) {
+      P.sbadges.push(st.id);
+      await sleep(300);
+      await LUI.badgePopup(st, `${st.name} 배지 획득!`, `${st.name}의 규칙 ${stateTot(st.id)}개를 모두 익혔다`);
+      clearConsole();
+      await G.checkGrowth();
+    }
+  }
+  /* 업적 */
+  const totals = () => { let n = 0, ok = 0, mq = 0; Object.values(P.seenQ).forEach((v) => { n += v.n; ok += v.ok; if ((v.st || 0) >= 3) mq++; }); return { n, ok, mq }; };
+  G.totals = totals;
+  const ACH_CHECK = {
+    first_win: () => P.wins >= 1, streak5: () => P.st.bs >= 5, streak10: () => P.st.bs >= 10, streak25: () => P.st.bs >= 25,
+    c50: () => totals().ok >= 50, c100: () => totals().ok >= 100, c300: () => totals().ok >= 300,
+    perfect1: () => P.st.pf >= 1, perfect10: () => P.st.pf >= 10, first_badge: () => P.sbadges.length >= 1, det_master: () => hasSB("det"),
+    core5: () => LT.CORE.every(hasSB), all_states: () => LT.STATES.every((s) => hasSB(s.id)), lv10: () => P.lv >= 10,
+    gym_win: () => !!P.flags.beat_leader1, gym_nodmg: () => !!P.flags.gym_nodmg, q20: () => totals().mq >= 20,
+    dex_all: () => LT.LMON.filter((m) => !m.boss).every((m) => P.met.includes(m.id))
+  };
+  G.checkAch = async function () {
+    for (const a of LT.ACH) {
+      if (P.ach.includes(a.id) || !ACH_CHECK[a.id] || !ACH_CHECK[a.id]()) continue;
+      P.ach.push(a.id); if (!P.title) P.title = a.title;
+      window.LUI && (LUI.sfx("ach"), LUI.toast(`🏆 업적 「${a.name}」<br><small>칭호 「${a.title}」 획득</small>`, "ach"));
+      await sleep(250);
+    }
+  };
+
   /* ---------------- 문제 선택 ---------------- */
-  const levelMaxD = () => (P.lv <= 2 ? 1 : P.lv <= 5 ? 2 : 3);
+  const levelMaxD = () => (P.lv <= 2 ? 1 : P.lv <= 6 ? 2 : 3);
   const recent = [];
-  function pickQuestion(opt) {
+  function pickLQ(opt, m) {
+    const maxD = opt.maxD || levelMaxD(), minD = Math.min(opt.minD || 1, maxD);
+    let fams = m && m.fam ? [m.fam] : opt.fams || LT.CORE;
+    let base = [].concat(...fams.map((f) => LT.LQ_BY_FAM[f] || []));
+    let pool = base.filter((q) => q.d >= minD && q.d <= maxD && !recent.includes(q.id));
+    if (pool.length < 3) pool = base.filter((q) => q.d <= Math.max(maxD, 2) && !recent.includes(q.id));
+    if (!pool.length) pool = base.filter((q) => !recent.includes(q.id));
+    if (!pool.length) pool = base;
+    const focus = (m && m.rules) || [];
+    const wts = pool.map((q) => { const s = P.seenQ[q.id]; let w = 1; if (!ruleOK(q.rule)) w *= 4; if (focus.includes(q.rule)) w *= 3; if (!s) w *= 3; else if ((s.st || 0) === 0 && s.n > s.ok) w *= 5; else if ((s.st || 0) >= 3) w *= 0.4; return w; });
+    let r = Math.random() * wts.reduce((a, b) => a + b, 0), q = pool[0];
+    for (let i = 0; i < pool.length; i++) { r -= wts[i]; if (r <= 0) { q = pool[i]; break; } }
+    recent.push(q.id); if (recent.length > 15) recent.shift(); return q;
+  }
+  function pickQuestion(opt, m) {
+    if ((m && m.ltssm) || opt.fams) return pickLQ(opt, m);
     const maxD = opt.maxD || levelMaxD(), minD = Math.min(opt.minD || 1, maxD);
     let pool = S.QUESTIONS.filter((q) => opt.chapters.includes(q.ch) && q.d >= minD && q.d <= maxD && !recent.includes(q.id));
     if (!pool.length) pool = S.QUESTIONS.filter((q) => opt.chapters.includes(q.ch) && !recent.includes(q.id));
     if (!pool.length) pool = S.QUESTIONS.filter((q) => opt.chapters.includes(q.ch));
-    const weighted = []; pool.forEach((q) => { const s = P.seenQ[q.id]; const w = !s ? 4 : s.ok >= 2 ? 1 : 2; for (let i = 0; i < w; i++) weighted.push(q); });
+    const weighted = []; pool.forEach((q) => { const s = P.seenQ[q.id]; const w = !s ? 4 : (s.st || 0) === 0 && s.n > s.ok ? 5 : s.ok >= 2 ? 1 : 2; for (let i = 0; i < w; i++) weighted.push(q); });
     const q = weighted[rnd(weighted.length)]; recent.push(q.id); if (recent.length > 12) recent.shift(); return q;
   }
   G.pickQuestion = pickQuestion;
 
   /* ---------------- 전투 ---------------- */
-  // opt: { kind: 'wild'|'trainer'|'boss', team:[monId], chapters:[ch], trainer:'이름', minD, maxD, xp }
+  // opt: { kind: 'wild'|'trainer'|'boss', team:[monId], chapters:[ch], fams:[state], trainer:'이름', minD, maxD, xp, onStart }
   G.battle = async function (opt) {
-    const prevMode = G.mode; await flash(3); G.mode = "battle";
-    B = { enemy: null, ehp: 0, emax: 0, eShake: 0, pShake: 0, eBlink: 0, eSlide: 60, eVisible: true, replay: false, title: opt.kind === "boss" ? "★ 관장전 = 챕터 시험 ★" : "" };
+    const prevMode = G.mode; await flash(3); G.mode = "battle"; document.body.classList.add("battle");
+    B = { enemy: null, ehp: 0, emax: 0, eShake: 0, pShake: 0, eBlink: 0, eSlide: 60, eVisible: true, replay: false, wrong: 0, combo: 0, dmgTaken: 0,
+      title: opt.kind === "boss" ? "★ 관장전 ★" : opt.kind === "trainer" ? "트레이너 배틀" : "" };
     let result = "win";
     outer: for (let ti = 0; ti < opt.team.length; ti++) {
       const id = opt.team[ti], m = S.MONSTERS[id];
-      B.enemy = Object.assign({ id }, m); B.emax = B.ehp = m.hp; B.eVisible = true; B.eSlide = 60;
+      if (m.ltssm && !P.met.includes(id)) P.met.push(id);
+      const hp = m.ltssm ? Math.round(14 + 3 * P.lv + (m.boss ? 18 + 2 * P.lv : 0) + (opt.kind !== "wild" ? 4 : 0)) : m.hp;
+      const atk = m.ltssm ? Math.round(4 + P.lv * 0.9 + (m.boss ? 3 : 0)) : m.atk;
+      B.enemy = Object.assign({ id }, m, { atk }); B.emax = B.ehp = hp; B.eVisible = true; B.eSlide = 60;
       for (let k = 0; k < 15; k++) { B.eSlide -= 4; await sleep(16); } B.eSlide = 0;
-      await G.say(opt.kind === "wild" ? `야생의 ${m.name}이(가) 나타났다!` : `${opt.trainer}은(는) ${m.name}을(를) 내보냈다!`);
+      await G.say(opt.kind === "wild" ? `야생의 ${m.name}이(가) 나타났다!${m.sub ? `\n(${m.sub})` : ""}` : `${opt.trainer}은(는) ${m.name}을(를) 내보냈다!`);
       while (B.ehp > 0 && P.hp > 0) {
         const acts = ["기술", "가방", "도망"];
-        const a = await G.choose(acts, { prompt: `${m.name}  HP ${B.ehp}/${B.emax}\n무엇을 할까?`, grid: true });
+        const a = await G.choose(acts, { prompt: `${m.name}  HP ${B.ehp}/${B.emax}${P.st.cs >= 2 ? `   🔥${P.st.cs} 콤보` : ""}\n무엇을 할까?`, grid: true });
         if (a === 0) {
-          const ms = P.moves.map((x) => S.MOVES.find((y) => y.id === x));
-          const k = await G.choose(ms.map((x) => x.name), { prompt: "어떤 기술을 쓸까?", cancel: true, hint: (i) => ms[i] && ms[i].desc });
+          const ms = P.moves.map((x) => S.MOVES.find((y) => y.id === x)).filter(Boolean);
+          const k = await G.choose(ms.map((x) => x.name), { prompt: "어떤 기술을 쓸까?", cancel: true, grid: ms.length > 3, hint: (i) => ms[i] && ms[i].desc });
           if (k < 0) continue;
-          await quizTurn(ms[k], opt, m);
+          await quizTurn(ms[k], opt, B.enemy);
         } else if (a === 1) {
           const used = await battleBag(); if (!used) continue;
         } else {
@@ -421,17 +530,23 @@
       if (P.hp <= 0) { result = "lose"; break; }
       B.eBlink = 30; await sleep(500); B.eVisible = false;
       await G.say(`${m.name}을(를) 쓰러뜨렸다!`);
-      const xp = opt.xp ? Math.round(opt.xp / opt.team.length) : 6 + m.ch * 4 + (m.boss ? 15 : 0);
-      await G.gainXP(xp);
-      if (P.ltssm === "Polling" && L("configuration")) await G.setLTSSM("Configuration", "🔗 첫 실전에서 Lane 번호와 Link 폭 협상 성공!\nLTSSM: Polling → Configuration");
+      let xp = opt.xp ? Math.round(opt.xp / opt.team.length) : m.ltssm ? 5 + (opt.kind !== "wild" ? 4 : 0) + (m.boss ? 12 : 0) : 6 + m.ch * 4 + (m.boss ? 15 : 0);
+      const notes = [];
+      if (B.combo) { notes.push(`🔥 콤보 보너스 +${B.combo}`); xp += B.combo; }
+      if (ti === opt.team.length - 1 && B.wrong === 0) { const bonus = Math.max(2, Math.round(xp * 0.3)); xp += bonus; P.st.pf++; notes.push(`✨ 퍼펙트 배틀! +${bonus}`); }
+      B.combo = 0;
+      await G.gainXP(xp, notes.join("  "));
     }
+    document.body.classList.remove("battle");
     if (result === "lose") {
+      P.st.cs = 0;
       await G.say(["Link Down... 눈앞이 캄캄해졌다!", "🔁 Hot Reset! Reset 센터에서 깨어났다."]);
       P.hp = maxHP(); B = null; G.mode = "field"; await G.warp("center", 4, 4, "up");
       return "lose";
     }
-    if (result === "win") P.wins++;
+    if (result === "win") { P.wins++; if (opt.kind === "boss" && B.dmgTaken === 0) P.flags.gym_nodmg_pending = true; }
     await G.fade(1); B = null; G.mode = prevMode === "battle" ? "field" : prevMode; await G.fade(0);
+    await G.checkAch();
     G.save(); return result;
   };
   async function battleBag() {
@@ -449,80 +564,159 @@
     await G.say(it.desc); return false;
   }
   G.useItem = useItem;
+  const qStatHTML = (s) => !s ? `<span class="tag new">NEW</span>` : `<span class="tag ok">✓${s.ok}</span><span class="tag ng">✗${s.n - s.ok}</span>${(s.st || 0) >= 3 ? `<span class="tag ms">👑 마스터</span>` : (s.st || 0) > 0 ? `<span class="tag st">연속 ${s.st}</span>` : ""}`;
   async function quizTurn(move, opt, m) {
-    const q = pickQuestion(opt);
+    const q = pickQuestion(opt, m);
     const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
     const labels = order.map((i) => q.c[i]); const correct = order.indexOf(q.a);
     const dis = new Set(); const wrong = [0, 1, 2, 3].filter((i) => i !== correct).sort(() => Math.random() - 0.5);
     if (move.effect === "elim") dis.add(wrong[0]); if (move.effect === "elim2") { dis.add(wrong[0]); dis.add(wrong[1]); }
     let replay = move.effect === "replay" || B.replay; B.replay = false;
     const stars = "★".repeat(q.d) + "☆".repeat(3 - q.d);
-    const header = `[${move.name}] ${S.CONCEPTS[q.concept].name} · 난이도 ${stars}`;
+    const topic = q.rule ? `${stateOf(q.fam).name}${stateOf(q.fam).tag ? " · " + stateOf(q.fam).tag : ""}` : S.CONCEPTS[q.concept].name;
+    const header = `[${move.name}] ${topic} · ${stars}`;
+    const s0 = P.seenQ[q.id];
+    const ruleTag = q.rule ? ` <span class="tag rl">규칙 ${Math.min(ruleN(q.rule), LT.RULE_NEED)}/${LT.RULE_NEED}${ruleOK(q.rule) ? " ✔" : ""}</span>` : "";
+    const grid = labels.every((l) => l.length <= 13);
     let pick;
     while (true) {
-      pick = await G.choose(labels, { header, prompt: q.q, disabled: dis });
+      pick = await G.choose(labels, { header, prompt: q.q, sub: qStatHTML(s0) + ruleTag, disabled: dis, quiz: true, grid });
       if (pick === correct || !replay) break;
       dis.add(pick); replay = false; G.markChoices(-1, pick); await sleep(250);
-      await G.say("❌ 오답... 하지만 Nak 수신 → Replay Buffer에서 재전송! 한 번 더!");
+      await G.say("❌ 오답... 하지만 재전송! 한 번 더!");
     }
     const ok = pick === correct; G.markChoices(correct, pick);
-    const s = (P.seenQ[q.id] = P.seenQ[q.id] || { n: 0, ok: 0 }); s.n++; if (ok) s.ok++;
-    const ms = (P.mastery[q.concept] = P.mastery[q.concept] || { n: 0, ok: 0 }); ms.n++; if (ok) ms.ok++;
+    const s = (P.seenQ[q.id] = P.seenQ[q.id] || { n: 0, ok: 0, st: 0 }); s.n++; if (ok) { s.ok++; s.st = (s.st || 0) + 1; } else s.st = 0;
+    if (q.concept) { const ms = (P.mastery[q.concept] = P.mastery[q.concept] || { n: 0, ok: 0 }); ms.n++; if (ok) ms.ok++; }
+    if (ok) { P.st.cs++; P.st.bs = Math.max(P.st.bs, P.st.cs); } else { P.st.cs = 0; B.wrong++; }
+    window.LUI && LUI.sfx(ok ? (P.st.cs >= 3 ? "combo" : "ok") : "ng");
     await sleep(350);
-    await G.say([`${ok ? "⭕ 정답!" : "❌ 오답!"}  정답: ${q.c[q.a]}`, `📘 ${q.e}`]);
-    if (!P.learned[q.concept]) { await G.learn(q.concept); }
+    const newMaster = ok && s.st === 3;
+    const statLine = `✓${s.ok} ✗${s.n - s.ok}${newMaster ? "  👑 이 문제 마스터!" : s.st >= 3 ? "  👑" : ""}${ok && P.st.cs >= 3 ? `  🔥 ${P.st.cs} 콤보!` : ""}`;
+    await G.say([`${ok ? "⭕ 정답!" : "❌ 오답!"}  정답: ${q.c[q.a]}\n${statLine}`, `📘 ${q.e}`]);
+    if (q.concept && !P.learned[q.concept]) await G.learn(q.concept);
+    if (ok && q.rule) await ruleProgress(q.rule);
     if (ok) {
+      if (P.st.cs >= 3) B.combo = Math.min(5, B.combo + 1);
       let pow = move.power;
       if (move.effect === "lanes") pow += 4 * Math.log2(P.width) + 2;
       if (move.effect === "diff") pow = 7 + 6 * q.d;
-      const mult = 1 + 0.12 * (P.gen - 1) + 0.06 * Math.log2(P.width);
+      const mult = (1 + 0.12 * (P.gen - 1) + 0.06 * Math.log2(P.width)) * (P.st.cs >= 5 ? 1.15 : 1);
       const dmg = Math.max(1, Math.round((pow + P.lv * 1.5) * mult * (0.9 + Math.random() * 0.2)));
       B.eShake = 20; B.ehp = Math.max(0, B.ehp - dmg);
-      let msg = `Link의 「${move.name}」! ${m.name}에게 ${dmg} 데미지!`;
-      if (move.effect === "heal") { const h = Math.round(maxHP() * 0.35); const b = P.hp; P.hp = Math.min(maxHP(), P.hp + h); msg += `\nUpdateFC로 credit 반환 → HP ${P.hp - b} 회복!`; }
+      let msg = `Link의 「${move.name}」! ${m.name}에게 ${dmg} 데미지!${P.st.cs >= 5 ? " (콤보 강화)" : ""}`;
+      if (move.effect === "heal") { const h = Math.round(maxHP() * (move.heal || 0.35)); const b = P.hp; P.hp = Math.min(maxHP(), P.hp + h); msg += `\nHP ${P.hp - b} 회복!`; }
       await G.say(msg);
     } else {
       let dmg = m.atk + rnd(3);
       if (move.effect === "risky") dmg = Math.round(dmg * 1.5);
       if (move.effect === "fec") dmg = Math.round(dmg * 0.5);
-      B.pShake = 20; P.hp = Math.max(0, P.hp - dmg);
-      await G.say(`${m.name}의 반격! Link는 ${dmg} 데미지를 받았다.${move.effect === "fec" ? " (FEC 보정으로 피해 절반)" : ""}`);
+      B.pShake = 20; P.hp = Math.max(0, P.hp - dmg); B.dmgTaken += dmg;
+      let msg = `${m.name}의 반격! Link는 ${dmg} 데미지를 받았다.${move.effect === "fec" ? " (피해 절반)" : ""}`;
+      if (move.effect === "echo") { const r = Math.max(1, Math.round(dmg / 2)); B.ehp = Math.max(0, B.ehp - r); B.eShake = 20; msg += `\nLoopback 에코! ${r} 데미지를 되돌려 보냈다.`; }
+      await G.say(msg);
     }
+    await G.checkAch();
   }
 
   /* ---------------- 필드 메뉴 ---------------- */
   async function fieldMenu() {
     while (true) {
       const ext = G.menuExtras || [];
-      const k = await G.choose(["Link 상태", "spec 도감", "기술", "가방", "저장"].concat(ext.map((e) => e.label), ["닫기"]), { prompt: "메뉴", cancel: true, grid: true });
-      if (k >= 5 && k < 5 + ext.length) { const r = await ext[k - 5].run(); if (r === "close") return; continue; }
+      const base = ["Link 상태", "규칙 도감", "배지 케이스", "몬스터 도감", "업적·칭호", "기록", "기술", "가방", "spec 도감", "저장"];
+      const k = await G.choose(base.concat(ext.map((e) => e.label), ["닫기"]), { prompt: "메뉴", cancel: true, grid: true });
+      const nb = base.length;
+      if (k >= nb && k < nb + ext.length) { const r = await ext[k - nb].run(); if (r === "close") return; continue; }
       if (k === 0) await statusPanel();
-      else if (k === 1) await dexPanel();
-      else if (k === 2) await movesPanel();
-      else if (k === 3) await bagPanel();
-      else if (k === 4) { G.save(); await G.say("💾 진행 상황을 저장했다. (localStorage)"); }
+      else if (k === 1) await ruleDex();
+      else if (k === 2) await badgeCase();
+      else if (k === 3) await monDex();
+      else if (k === 4) await achPanel();
+      else if (k === 5) await statsPanel();
+      else if (k === 6) await movesPanel();
+      else if (k === 7) await bagPanel();
+      else if (k === 8) await dexPanel();
+      else if (k === 9) { G.save(); await G.say("💾 진행 상황을 저장했다. (localStorage)"); }
       else return;
     }
   }
+  G.fieldMenu = fieldMenu;
   async function statusPanel() {
     const ch = S.CHAPTERS.find((c) => c.id === P.chapter) || S.CHAPTERS[0];
-    const learnedN = Object.keys(P.learned).length, total = Object.keys(S.CONCEPTS).length;
     const items = [
-      { label: `Lv ${P.lv}   EXP ${P.xp}/${xpNeed(P.lv)}`, desc: "정답으로 몬스터를 쓰러뜨리면 경험치를 얻는다. 레벨이 오르면 더 깊은 난이도의 문제가 나온다." },
-      { label: `HP ${P.hp}/${maxHP()}`, desc: "오답을 고르면 몬스터의 반격으로 HP가 줄어든다. 0이 되면 Link Down → Hot Reset." },
-      { label: `LTSSM: ${P.ltssm}`, desc: "Link의 상태 = 너의 spec 이해도. Detect → Polling → Configuration → L0 순으로 성장한다." },
-      { label: `속도: Gen${P.gen} (${RATE[P.gen]})`, desc: "L0 도달 후, 레벨과 '배운 개념'이 충분하면 Recovery를 거쳐 속도가 올라간다. (Gen3에는 Equalization·128b/130b 이해 필요)" },
-      { label: `Link 폭: x${P.width}`, desc: "Configuration 개념을 배운 뒤 레벨에 따라 x1→x2→x4→x8→x16으로 넓어진다." },
-      { label: `DL 상태: ${P.badges.includes("dl") ? "DL_Active" : P.ltssm === "L0" ? "DL_Init" : "DL_Inactive"}`, desc: "Data Link Layer 상태. 2장(Replay 체육관)을 클리어하면 DL_Active." },
-      { label: `배지: ${P.badges.length ? P.badges.map((b) => ({ l0: "L0 배지", dl: "DL_Active 배지" }[b] || b)).join(", ") : "없음"}`, desc: "관장(=챕터 시험)을 이기면 받는다." },
-      { label: `현재 장: ${ch.title}`, desc: `무대: ${ch.area}` },
-      { label: `spec 도감: ${learnedN}/${total}`, desc: "NPC·표지판·전투 해설로 개념을 배우면 도감에 등록된다." }
+      { label: `Lv ${P.lv}   EXP ${P.xp}/${xpNeed(P.lv)}`, bar: P.xp / xpNeed(P.lv), desc: "정답으로 몬스터를 쓰러뜨리면 경험치를 얻는다. 콤보·퍼펙트 배틀이면 보너스!" },
+      { label: `HP ${P.hp}/${maxHP()}`, bar: P.hp / maxHP(), desc: "오답을 고르면 몬스터의 반격으로 HP가 줄어든다. 0이 되면 Link Down → Hot Reset." },
+      { label: `칭호: ${P.title || "(없음)"}`, desc: "업적을 달성하면 칭호를 얻는다. 업적·칭호 메뉴에서 바꿀 수 있다." },
+      { label: `LTSSM: ${P.ltssm}`, desc: "Detect 배지 → Polling, Polling 배지 → Configuration, Configuration 배지 → L0(2.5 GT/s)." },
+      { label: `속도: Gen${P.gen} (${RATE[P.gen]})`, desc: "L0 이후 Recovery 배지(속도 변경), Equalization 배지(8 GT/s 이상), L0p 배지(Flit, 64/128 GT/s)와 레벨이 필요하다." },
+      { label: `Link 폭: x${P.width}`, desc: "L0에 도달한 뒤 레벨에 따라 x1→x2→x4→x8→x16." },
+      { label: `state 배지: ${P.sbadges.length}/${LT.STATES.length}`, bar: P.sbadges.length / LT.STATES.length, desc: "각 state의 규칙을 모두 익히면 그 state 배지." },
+      { label: `관장 배지: ${P.badges.length ? P.badges.map((b) => ({ l0: "LTSSM 마스터", dl: "DL_Active" }[b] || b)).join(", ") : "없음"}`, desc: "관장을 이기면 받는다." },
+      { label: `현재 장: ${ch.title}`, desc: `무대: ${ch.area}` }
     ];
     await G.panel("Link 상태", items);
   }
+  async function ruleDex() {
+    const items = [];
+    LT.STATES.forEach((st) => {
+      const d = stateDone(st.id), t = stateTot(st.id);
+      items.push({ sec: true, label: `${st.name}${st.tag ? " (" + st.tag + ")" : ""}  ${d}/${t}${hasSB(st.id) ? " 🏅" : ""}`, icon: LUI.badgeURL(st, !hasSB(st.id), 2), bar: d / t, cls: "secbar" });
+      Object.entries(st.rules).forEach(([rid, text]) => {
+        const n = Math.min(ruleN(rid), LT.RULE_NEED), seen = Object.keys(P.seenQ).some((k) => k.startsWith("L" + rid + "_"));
+        const dots = "●".repeat(n) + "○".repeat(LT.RULE_NEED - n);
+        const qs = LT.LQ.filter((q) => q.rule === rid), qok = qs.filter((q) => P.seenQ[q.id] && P.seenQ[q.id].ok).length;
+        items.push({ label: `${dots} ${ruleOK(rid) || seen ? text : "??? (아직 못 만난 규칙)"}`, lock: !ruleOK(rid),
+          desc: `【${st.name}】 ${ruleOK(rid) ? "✔ 습득" : `${n}/${LT.RULE_NEED} 정답`}\n${ruleOK(rid) || seen ? text : "이 규칙의 문제를 만나면 내용이 보인다."}\n관련 문제 ${qs.length}개 중 ${qok}개 맞힘`.trim() });
+      });
+    });
+    const tot = Object.keys(LT.RULES).length, done = Object.keys(LT.RULES).filter(ruleOK).length;
+    await G.panel(`규칙 도감 ${done}/${tot}`, items);
+  }
+  async function badgeCase() {
+    const list = LT.STATES.map((st) => ({ st, got: hasSB(st.id) })).concat([{ st: Object.assign({ isMaster: true }, LT.MASTER), got: P.badges.includes("l0") }]);
+    const items = list.map(({ st, got }) => ({ icon: LUI.badgeURL(st, !got, 3), label: got ? st.name : "???", lock: !got, cls: "bslot" + (got ? " got" : ""),
+      desc: st.isMaster ? (got ? "🏆 LTSSM 마스터 배지 — LTSSM 관장을 이긴 증표." : "LTSSM 관장을 이기면 받는다. (Lv10 + 핵심 배지 5개)") :
+        got ? `🏅 ${st.name} 배지\n${st.intro}` : `${st.name}: 규칙 ${stateDone(st.id)}/${stateTot(st.id)}${st.core ? "  · 관장 도전 필수" : ""}\n${st.intro}` }));
+    const n = list.filter((x) => x.got).length;
+    await G.panel(`배지 케이스 ${n}/${list.length}`, items, { cols: 4 });
+  }
+  async function monDex() {
+    const items = [];
+    LT.STATES.forEach((st) => {
+      const ms = LT.LMON.filter((m) => m.fam === st.id && !m.boss); if (!ms.length) return;
+      items.push({ sec: true, label: st.name });
+      ms.forEach((m) => { const met = P.met.includes(m.id); items.push({ icon: LUI.monIcon(m, !met), label: met ? m.name : "???", lock: !met, cls: "mon",
+        desc: met ? `【${m.name}】 ${m.sub}\n집중 규칙: ${(m.rules || []).map((r) => LT.RULES[r].text.split(/[:,]/)[0]).join(" / ")}` : "아직 만나지 못한 몬스터. 서식지를 돌아다녀 보자." }); });
+    });
+    const tot = LT.LMON.filter((m) => !m.boss).length, met = LT.LMON.filter((m) => !m.boss && P.met.includes(m.id)).length;
+    await G.panel(`몬스터 도감 ${met}/${tot}`, items);
+  }
+  async function achPanel() {
+    while (true) {
+      const items = LT.ACH.map((a) => { const got = P.ach.includes(a.id); return { label: `${got ? "🏆" : "🔒"} ${a.name}${got && P.title === a.title ? "  (장착 중)" : ""}`, lock: !got, desc: `${a.desc}\n칭호: 「${got ? a.title : "???"}」${got ? "\n(A: 칭호 장착)" : ""}` }; });
+      const k = await G.panel(`업적 ${P.ach.length}/${LT.ACH.length} · 칭호 「${P.title || "-"}」`, items, { selectable: true });
+      if (k < 0) return;
+      const a = LT.ACH[k]; if (P.ach.includes(a.id)) { P.title = a.title; window.LUI && LUI.toast(`칭호 「${a.title}」 장착!`); }
+    }
+  }
+  async function statsPanel() {
+    const t = totals(), acc = t.n ? Math.round((t.ok / t.n) * 100) : 0, min = Math.round((P.playMs || 0) / 60000);
+    const rulesDone = Object.keys(LT.RULES).filter(ruleOK).length, rulesTot = Object.keys(LT.RULES).length;
+    const items = [
+      { label: `총 답변 ${t.n}  ·  정답 ${t.ok}  ·  오답 ${t.n - t.ok}`, desc: "퀴즈 배틀에서 고른 답의 누적 기록." },
+      { label: `정확도 ${acc}%`, bar: acc / 100, desc: "정답 ÷ 전체 답변." },
+      { label: `최고 연속 정답 ${P.st.bs}  (현재 ${P.st.cs})`, desc: "3연속부터 콤보 보너스 XP, 5연속부터 공격력 +15%." },
+      { label: `퍼펙트 배틀 ${P.st.pf}회  ·  승리 ${P.wins}회`, desc: "오답 없이 이긴 배틀은 XP +30%." },
+      { label: `마스터한 문제 ${t.mq} / 푼 문제 ${Object.keys(P.seenQ).length}`, desc: "같은 문제를 3번 연속 맞히면 👑 마스터." },
+      { label: `규칙 ${rulesDone}/${rulesTot}`, bar: rulesDone / rulesTot, desc: "규칙마다 정답 2번이면 습득." },
+      { label: `플레이 시간 ${Math.floor(min / 60)}시간 ${min % 60}분`, desc: "필드·전투 시간 합계." }
+    ];
+    LT.STATES.forEach((st) => items.push({ label: `${st.name} ${Math.round((stateDone(st.id) / stateTot(st.id)) * 100)}%`, bar: stateDone(st.id) / stateTot(st.id), icon: LUI.badgeURL(st, !hasSB(st.id), 2), cls: "mini", desc: `${st.name} 규칙 ${stateDone(st.id)}/${stateTot(st.id)}` }));
+    await G.panel("기록", items);
+  }
   async function dexPanel() {
     const items = [];
-    S.CHAPTERS.forEach((c) => {
+    S.CHAPTERS.filter((c) => c.id >= 2).forEach((c) => {
       items.push({ sec: true, label: c.title + (c.status === "stub" ? " (준비 중)" : "") });
       Object.entries(S.CONCEPTS).filter(([, v]) => v.ch === c.id).forEach(([id, v]) => {
         const l = P.learned[id], ms = P.mastery[id];
@@ -530,10 +724,11 @@
         items.push({ label: l ? `${v.name}${star}` : "??? (미발견)", lock: !l, desc: l ? `【${v.name}】${ms ? `  정답 ${ms.ok}/${ms.n}` : ""}\n${v.note}` : "아직 배우지 않은 개념. NPC와 대화하거나 퀴즈 배틀에서 만나면 등록된다." });
       });
     });
-    await G.panel(`spec 도감 (${Object.keys(P.learned).length}/${Object.keys(S.CONCEPTS).length})`, items);
+    await G.panel(`spec 도감 (2장~)`, items);
   }
   async function movesPanel() {
-    const items = S.MOVES.map((m) => { const has = P.moves.includes(m.id); return { label: has ? m.name : `??? (Lv${m.lv} + 「${S.CONCEPTS[m.concept].name}」 학습)`, lock: !has, desc: has ? `【${m.name}】 관련 개념: ${S.CONCEPTS[m.concept].name}\n${m.desc}` : `Lv${m.lv} 이상 + 「${S.CONCEPTS[m.concept].name}」 개념을 배우면 습득. ${P.learned[m.concept] ? "(개념 학습 완료 ✓)" : "(개념 미학습)"}` }; });
+    const items = S.MOVES.map((m) => { const has = P.moves.includes(m.id); return { label: has ? m.name : `??? (Lv${m.lv} + ${moveReqText(m)})`, lock: !has,
+      desc: has ? `【${m.name}】\n${m.desc}` : `Lv${m.lv} 이상 + ${moveReqText(m)}이면 습득. ${moveReqMet(m) ? "(조건 충족 ✓)" : m.req ? `(현재 ${stateDone(m.req.s)}/${m.req.n})` : "(미학습)"}` }; });
     await G.panel("기술 (spec 메커니즘)", items);
   }
   async function bagPanel() {
@@ -557,7 +752,7 @@
       const k = await G.choose(opts, { prompt: "SPEC 몬스터 골드 — PCIe/CXL 편\nA: 선택  (키보드: Z=A, X=B, 방향키)" });
       const e = ext.find((x) => x.label === opts[k]);
       if (e) { if (await e.run()) { G.mode = "field"; showFieldHint(); return; } continue; }
-      if (opts[k] === "이어하기") { G.load(); G.mode = "field"; showFieldHint(); }
+      if (opts[k] === "이어하기") { G.load(); G.mode = "field"; showFieldHint(); if (G.justMigrated && G.onMigrated) runScript(G.onMigrated); }
       else { G.newGame(); G.mode = "field"; G.save(); if (G.onNewGame) runScript(G.onNewGame); }
       return;
     }

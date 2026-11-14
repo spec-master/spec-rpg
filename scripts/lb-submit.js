@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const SC = require("../js/savecode.js");
-const SPEC = require("../js/data.js");
+const SPEC = require("../js/ltssm.js"); // data.js + LTSSM 문제/규칙
 const LB = path.join(__dirname, "..", "data", "leaderboard.json");
 const OUT = process.env.RESULT_FILE || "/tmp/lb-result.md";
 const RATE_MS = 10 * 60 * 1000, MAX_ENTRIES = 500;
@@ -19,7 +19,7 @@ const RATE_MS = 10 * 60 * 1000, MAX_ENTRIES = 500;
     const nick = SC.cleanNick(nickM[1]);
     if (!SC.validNick(nick)) return say(false, "닉네임은 2~12자의 한글/영문/숫자/_/- 만 가능합니다.");
     if (codeM[1].length > 20000) return say(false, "저장 코드가 너무 깁니다.");
-    const st = await SC.decode(codeM[1]);
+    const st = SC.migrate(await SC.decode(codeM[1]), SPEC).P;
     const errs = SC.validate(st, SPEC);
     const m = SC.computeScore(st);
     // 간단한 상식 점검 (치트 방지 기본선)
@@ -34,7 +34,7 @@ const RATE_MS = 10 * 60 * 1000, MAX_ENTRIES = 500;
     if (prev && Date.now() - Date.parse(prev.at) < RATE_MS) return say(false, "10분에 한 번만 제출할 수 있습니다.");
     const taken = board.entries.find((e) => e.nick === nick && e.user !== user);
     if (taken) return say(false, `닉네임 '${nick}'은(는) 이미 다른 사용자가 쓰고 있습니다.`);
-    const entry = { user, nick, score: m.score, lv: m.lv, badges: m.badges, concepts: m.concepts, correct: m.correct, answered: m.answered, acc: Math.round(m.acc * 1000) / 1000, playMin: m.playMin, at: new Date().toISOString() };
+    const entry = { user, nick, score: m.score, lv: m.lv, badges: m.badges, sbadges: m.sbadges, rules: m.rules, concepts: m.concepts, correct: m.correct, answered: m.answered, acc: Math.round(m.acc * 1000) / 1000, playMin: m.playMin, at: new Date().toISOString() };
     let note = "";
     if (prev && prev.score > entry.score) { prev.nick = nick; prev.at = entry.at; note = ` (기존 최고점 ${prev.score}점 유지)`; }
     else if (prev) Object.assign(prev, entry); else board.entries.push(entry);
@@ -43,7 +43,7 @@ const RATE_MS = 10 * 60 * 1000, MAX_ENTRIES = 500;
     board.updated = new Date().toISOString(); board.version = 1;
     fs.writeFileSync(LB, JSON.stringify(board, null, 1) + "\n");
     const rank = board.entries.findIndex((e) => e.user === user) + 1;
-    say(true, `${nick} 님 ${m.score}점 등록! 현재 ${rank}위 / ${board.entries.length}명${note}\nLv${m.lv} · 배지 ${m.badges} · 도감 ${m.concepts} · 정답 ${m.correct}/${m.answered}`);
+    say(true, `${nick} 님 ${m.score}점 등록! 현재 ${rank}위 / ${board.entries.length}명${note}\nLv${m.lv} · 관장 배지 ${m.badges} · state 배지 ${m.sbadges} · 규칙 ${m.rules} · 정답 ${m.correct}/${m.answered}`);
     fs.writeFileSync("/tmp/lb-changed", "1");
   } catch (e) { say(false, "처리 중 오류: " + (e.message || e)); }
 })();

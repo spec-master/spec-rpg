@@ -62,11 +62,12 @@
   async function applyCode(code) {
     let st;
     try { st = await SC.decode(code); } catch (e) { await G.say("⚠️ 불러오기 실패: " + e.message); return false; }
+    const mig = SC.migrate(st, S); st = mig.P;
     const errs = SC.validate(st, S);
     if (!G.maps[st.map]) errs.push("알 수 없는 맵");
     if (errs.length) { await G.say("⚠️ 저장 코드 검증 실패: " + errs.slice(0, 3).join(", ")); return false; }
     const sc = SC.computeScore(st);
-    const k = await G.choose(["덮어쓰기", "취소"], { header: "저장 코드 확인 ✓", prompt: `Lv${st.lv} · ${st.ltssm} Gen${st.gen} x${st.width} · 배지 ${st.badges.length}개 · 도감 ${sc.concepts}개\n플레이 ${fmtTime(st.playMs)} · 점수 ${sc.score}\n\n현재 기기의 진행 상황을 이 코드로 덮어쓸까요?`, cancel: true });
+    const k = await G.choose(["덮어쓰기", "취소"], { header: "저장 코드 확인 ✓", prompt: `Lv${st.lv} · ${st.ltssm} Gen${st.gen} x${st.width} · state 배지 ${(st.sbadges || []).length}개 · 관장 배지 ${st.badges.length}개\n플레이 ${fmtTime(st.playMs)} · 점수 ${sc.score}${mig.migrated ? "\n📦 구버전 코드 → 새 1번 마을 구조로 변환(레벨·배지·기록 유지)" : ""}\n\n현재 기기의 진행 상황을 이 코드로 덮어쓸까요?`, cancel: true });
     if (k !== 0) return false;
     G.setState(st); G.save();
     if (location.hash.startsWith("#save=")) history.replaceState(null, "", location.href.split("#")[0]);
@@ -112,14 +113,14 @@
     const items = [{ sec: true, label: `TOP 20 (참가 ${list.length}명)` }];
     if (!list.length) items.push({ label: "아직 기록이 없습니다. 첫 번째 주인공이 되어 보세요!", desc: "" });
     list.slice(0, 20).forEach((e, i) => items.push({ label: `${i + 1}. ${e.nick}  ${e.score}점${e.nick === myNick ? "  ◀ 나" : ""}`,
-      desc: `${i + 1}위 ${e.nick} (GitHub @${e.user})\nLv${e.lv} · 배지 ${e.badges} · 도감 ${e.concepts} · 정답 ${e.correct} · 정확도 ${Math.round(e.acc * 100)}% · ${e.playMin}분\n갱신: ${new Date(e.at).toLocaleString("ko-KR")}` }));
+      desc: `${i + 1}위 ${e.nick} (GitHub @${e.user})\nLv${e.lv} · 관장 배지 ${e.badges} · state 배지 ${e.sbadges || 0} · 규칙 ${e.rules || 0} · 정답 ${e.correct} · 정확도 ${Math.round(e.acc * 100)}% · ${e.playMin}분\n갱신: ${new Date(e.at).toLocaleString("ko-KR")}` }));
     items.push({ sec: true, label: "내 순위" });
     const myIdx = myNick ? list.findIndex((e) => e.nick === myNick) : -1;
     items.push({ label: myIdx >= 0 ? `${myIdx + 1}위 / ${list.length}명 · 등록 점수 ${list[myIdx].score}점` : "미등록 (메뉴 → 랭킹 → 점수 제출)", desc: myIdx >= 0 ? `닉네임 ${myNick}` : "아직 제출한 점수가 없거나, 반영 대기 중입니다 (1~2분)." });
     items.push({ label: `현재 점수 ${mine.score}점`, desc: scoreDesc(mine) });
     await G.panel(`🏆 랭킹 · 업데이트 ${board.updated ? new Date(board.updated).toLocaleString("ko-KR") : "-"}`, items);
   }
-  const scoreDesc = (m) => `레벨 ${m.parts.level} + 배지 ${m.parts.badges} + 도감 ${m.parts.dex} + 정답 ${m.parts.correct} + 정확도 ${m.parts.accuracy}\n(Lv×100, 배지×500, 도감×30, 정답×10, 10문제 이상 답하면 정확도%×5)`;
+  const scoreDesc = (m) => `레벨 ${m.parts.level} + 관장 배지 ${m.parts.badges} + state 배지 ${m.parts.sbadges} + 규칙 ${m.parts.rules} + 도감 ${m.parts.dex} + 정답 ${m.parts.correct} + 정확도 ${m.parts.accuracy}\n(Lv×100, 관장 배지×500, state 배지×200, 규칙×15, 도감×30, 정답×10, 10문제 이상 답하면 정확도%×5)`;
 
   async function submitScore() {
     const ad = LB(); if (!ad.enabled) { await G.say("🏆 랭킹은 준비 중입니다."); return; }

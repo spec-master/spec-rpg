@@ -49,7 +49,8 @@
   function pack(P) {
     const o = JSON.parse(JSON.stringify(P));
     o.learned = Object.keys(P.learned || {});           // 타임스탬프 제거 → 압축률 ↑
-    o.seenQ = Object.entries(P.seenQ || {}).map(([k, v]) => [k, v.n, v.ok]);
+    o.seenQ = Object.entries(P.seenQ || {}).map(([k, v]) => (v.st ? [k, v.n, v.ok, v.st] : [k, v.n, v.ok]));
+    o.rules = Object.entries(P.rules || {}).map(([k, v]) => [k, v]);
     o.mastery = Object.entries(P.mastery || {}).map(([k, v]) => [k, v.n, v.ok]);
     o.flags = Object.keys(P.flags || {}).filter((k) => P.flags[k]);
     o.playMs = Math.round(P.playMs || 0);
@@ -59,7 +60,8 @@
     if (!obj || obj.v !== 1 || typeof obj.s !== "object") throw new Error("지원하지 않는 저장 코드 버전입니다.");
     const o = obj.s; const P = Object.assign({}, o);
     P.learned = {}; (o.learned || []).forEach((k) => (P.learned[k] = 1));
-    P.seenQ = {}; (o.seenQ || []).forEach(([k, n, ok]) => (P.seenQ[k] = { n, ok }));
+    P.seenQ = {}; (o.seenQ || []).forEach(([k, n, ok, st]) => (P.seenQ[k] = { n, ok, st: st || 0 }));
+    P.rules = {}; (Array.isArray(o.rules) ? o.rules : []).forEach(([k, v]) => (P.rules[k] = v));
     P.mastery = {}; (o.mastery || []).forEach(([k, n, ok]) => (P.mastery[k] = { n, ok }));
     P.flags = {}; (o.flags || []).forEach((k) => (P.flags[k] = true));
     return P;
@@ -88,6 +90,8 @@
 
   /* ---- 검증 (치트/손상 방지 기본 점검) ---- */
   const BADGES = ["l0", "dl"], LTSSM = ["Detect", "Polling", "Configuration", "L0"];
+  /* 구버전(v1 진행 구조) 저장 → 현재 구조로 이주 (SPEC.LTSSM.migrate) */
+  function migrate(P, SPEC) { return SPEC && SPEC.LTSSM && SPEC.LTSSM.migrate ? SPEC.LTSSM.migrate(P) : { P, migrated: false }; }
   function validate(P, SPEC) {
     const err = [];
     const int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
@@ -97,7 +101,7 @@
     if (!int(P.x, 0, 200) || !int(P.y, 0, 200)) err.push("위치 오류");
     if (!["up", "down", "left", "right"].includes(P.dir)) err.push("방향 오류");
     if (!LTSSM.includes(P.ltssm)) err.push("LTSSM 상태 오류");
-    if (!int(P.gen, 1, 6) || ![1, 2, 4, 8, 16].includes(P.width)) err.push("Gen/폭 오류");
+    if (!int(P.gen, 1, 7) || ![1, 2, 4, 8, 16].includes(P.width)) err.push("Gen/폭 오류");
     if (!int(P.chapter, 1, 7)) err.push("챕터 오류");
     if (!Array.isArray(P.badges) || P.badges.some((b) => !BADGES.includes(b))) err.push("배지 오류");
     if (P.badges && P.badges.includes("dl") && !P.badges.includes("l0")) err.push("배지 순서 오류");
@@ -109,21 +113,34 @@
       if (P.moves.some((m) => !SPEC.MOVES.find((x) => x.id === m))) err.push("알 수 없는 기술");
       if (Object.keys(P.learned).some((k) => !SPEC.CONCEPTS[k])) err.push("알 수 없는 개념");
       if (Object.keys(P.items).some((k) => !SPEC.ITEMS[k])) err.push("알 수 없는 아이템");
-      if (Object.keys(P.seenQ).some((k) => !SPEC.QUESTIONS.find((q) => q.id === k))) err.push("알 수 없는 문제");
+      const LQ = SPEC.LTSSM ? SPEC.LTSSM.LQ : [];
+      const qids = new Set(SPEC.QUESTIONS.map((q) => q.id).concat(LQ.map((q) => q.id)));
+      if (Object.keys(P.seenQ).some((k) => !qids.has(k))) err.push("알 수 없는 문제");
+      if (SPEC.LTSSM) {
+        const L = SPEC.LTSSM, sids = L.STATES.map((s) => s.id);
+        if (P.sbadges != null && (!Array.isArray(P.sbadges) || P.sbadges.some((b) => !sids.includes(b)) || new Set(P.sbadges).size !== P.sbadges.length)) err.push("state 배지 오류");
+        if (P.rules != null && (typeof P.rules !== "object" || Object.entries(P.rules).some(([k, v]) => !L.RULES[k] || !int(v, 0, 99)))) err.push("규칙 기록 오류");
+        // state 배지는 그 state의 규칙을 모두 습득했을 때만
+        (P.sbadges || []).forEach((b) => { const st = L.STATES.find((s) => s.id === b); if (st && Object.keys(st.rules).some((r) => ((P.rules || {})[r] || 0) < L.RULE_NEED)) err.push("배지-규칙 불일치"); });
+        if (P.ach != null && (!Array.isArray(P.ach) || P.ach.some((a) => !L.ACH.find((x) => x.id === a)))) err.push("업적 오류");
+        if (P.met != null && (!Array.isArray(P.met) || P.met.some((m) => !SPEC.MONSTERS[m]))) err.push("몬스터 기록 오류");
+        if (P.st != null && (typeof P.st !== "object" || ["cs", "bs", "pf"].some((k) => P.st[k] != null && !int(P.st[k], 0, 1e6)))) err.push("통계 오류");
+      }
     }
-    for (const v of Object.values(P.seenQ || {})) if (!int(v.n, 0, 1e5) || !int(v.ok, 0, v.n)) { err.push("문제 기록 오류"); break; }
+    for (const v of Object.values(P.seenQ || {})) if (!int(v.n, 0, 1e5) || !int(v.ok, 0, v.n) || (v.st != null && !int(v.st, 0, v.ok))) { err.push("문제 기록 오류"); break; }
     return err;
   }
 
   /* ---- 점수 ---- */
   function stats(P) {
     let n = 0, ok = 0; Object.values(P.seenQ || {}).forEach((v) => { n += v.n; ok += v.ok; });
-    return { answered: n, correct: ok, acc: n ? ok / n : 0, concepts: Object.keys(P.learned || {}).length, badges: (P.badges || []).length, lv: P.lv, playMin: Math.round((P.playMs || 0) / 60000) };
+    const rules = Object.values(P.rules || {}).filter((v) => v >= 2).length;
+    return { answered: n, correct: ok, acc: n ? ok / n : 0, concepts: Object.keys(P.learned || {}).length, badges: (P.badges || []).length, sbadges: (P.sbadges || []).length, rules, lv: P.lv, playMin: Math.round((P.playMs || 0) / 60000) };
   }
-  /* 점수 = 레벨×100 + 배지×500 + 도감×30 + 정답×10 + 정확도 보너스(10문제 이상 답했을 때 정확도%×5) */
+  /* 점수 = 레벨×100 + 관장 배지×500 + state 배지×200 + 습득 규칙×15 + 도감×30 + 정답×10 + 정확도 보너스(10문제 이상 답했을 때 정확도%×5) */
   function computeScore(P) {
     const s = stats(P);
-    const parts = { level: s.lv * 100, badges: s.badges * 500, dex: s.concepts * 30, correct: s.correct * 10, accuracy: s.answered >= 10 ? Math.round(s.acc * 100) * 5 : 0 };
+    const parts = { level: s.lv * 100, badges: s.badges * 500, sbadges: s.sbadges * 200, rules: s.rules * 15, dex: s.concepts * 30, correct: s.correct * 10, accuracy: s.answered >= 10 ? Math.round(s.acc * 100) * 5 : 0 };
     return Object.assign(s, { parts, score: Object.values(parts).reduce((a, b) => a + b, 0) });
   }
   /* 닉네임: 2~12자, 한글/영문/숫자/_/- */
@@ -131,5 +148,5 @@
   const cleanNick = (s) => String(s || "").trim().normalize("NFC");
   const validNick = (s) => NICK_RE.test(cleanNick(s));
 
-  return { PREFIX, encode, decode, validate, computeScore, stats, validNick, cleanNick, crc32 };
+  return { PREFIX, encode, decode, validate, migrate, computeScore, stats, validNick, cleanNick, crc32 };
 });
