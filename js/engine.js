@@ -98,7 +98,7 @@
   const SAVE_KEY = "specrpg_save_v1";
   function newState() {
     return { map: "lab", x: 4, y: 6, dir: "up", lv: 1, xp: 0, hp: 30, chapter: 1, ltssm: "Detect", gen: 1, width: 1,
-      flags: {}, items: {}, learned: {}, mastery: {}, moves: [], badges: [], seenQ: {}, wins: 0 };
+      flags: {}, items: {}, learned: {}, mastery: {}, moves: [], badges: [], seenQ: {}, wins: 0, playMs: 0 };
   }
   G.P = () => P;
   const maxHP = () => 30 + 6 * (P.lv - 1);
@@ -111,6 +111,9 @@
   G.hasSave = () => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };
   G.load = () => { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); P = Object.assign(newState(), s); return true; } catch (e) { return false; } };
   G.newGame = () => { P = newState(); };
+  G.newState = newState;
+  G.setState = (s) => { P = Object.assign(newState(), s); P.hp = Math.min(P.hp, maxHP()); mv = null; };
+  G.setHandler = (h) => { handler = h; };
 
   /* ---------------- 입력 ---------------- */
   const held = { up: false, down: false, left: false, right: false };
@@ -122,8 +125,9 @@
   G.press = press;
   const KEYMAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right",
     z: "A", Z: "A", Enter: "A", " ": "A", x: "B", X: "B", Escape: "B", Backspace: "B", Shift: "START", m: "START" };
-  window.addEventListener("keydown", (e) => { const b = KEYMAP[e.key]; if (!b) return; e.preventDefault(); if (DIRS[b]) { held[b] = true; lastDir = b; } press(b); });
-  window.addEventListener("keyup", (e) => { const b = KEYMAP[e.key]; if (b && DIRS[b]) { held[b] = false; if (lastDir === b) lastDir = null; } });
+  const typing = (e) => e.target && e.target.closest && e.target.closest("input, textarea");
+  window.addEventListener("keydown", (e) => { if (typing(e)) return; const b = KEYMAP[e.key]; if (!b) return; e.preventDefault(); if (DIRS[b]) { held[b] = true; lastDir = b; } press(b); });
+  window.addEventListener("keyup", (e) => { if (typing(e)) return; const b = KEYMAP[e.key]; if (b && DIRS[b]) { held[b] = false; if (lastDir === b) lastDir = null; } });
   document.querySelectorAll("[data-b]").forEach((el) => {
     const b = el.dataset.b;
     const down = (e) => { e.preventDefault(); el.classList.add("on"); if (DIRS[b]) { held[b] = true; lastDir = b; } press(b); };
@@ -131,7 +135,7 @@
     el.addEventListener("pointerdown", down); el.addEventListener("pointerup", up); el.addEventListener("pointerleave", up); el.addEventListener("pointercancel", up);
     el.addEventListener("contextmenu", (e) => e.preventDefault());
   });
-  elConsole.addEventListener("pointerdown", (e) => { if (e.target.closest(".opt")) return; if (handler) press("A"); });
+  elConsole.addEventListener("pointerdown", (e) => { if (e.target.closest(".opt, input, textarea, button, a, .nogo")) return; if (handler) press("A"); });
   document.addEventListener("gesturestart", (e) => e.preventDefault());
   const heldDir = () => (lastDir && held[lastDir] ? lastDir : ["up", "down", "left", "right"].find((d) => held[d]) || null);
 
@@ -311,8 +315,11 @@
     ctx.drawImage(monSprite("ltssmdragon"), 60, 64);
     text("by teslanius", 58, 136, 6, "#88a070", false);
   }
+  let lastT = performance.now();
   function frame() {
     animT++;
+    const now = performance.now(), dt = Math.min(1000, now - lastT); lastT = now;
+    if (P && (G.mode === "field" || G.mode === "battle") && !document.hidden) P.playMs = (P.playMs || 0) + dt;
     ctx.setTransform(SC, 0, 0, SC, 0, 0); ctx.imageSmoothingEnabled = false;
     if (G.mode === "field") { updateField(); drawField(); }
     else if (G.mode === "battle" && B) drawBattle();
@@ -486,7 +493,9 @@
   /* ---------------- 필드 메뉴 ---------------- */
   async function fieldMenu() {
     while (true) {
-      const k = await G.choose(["Link 상태", "spec 도감", "기술", "가방", "저장", "닫기"], { prompt: "메뉴", cancel: true, grid: true });
+      const ext = G.menuExtras || [];
+      const k = await G.choose(["Link 상태", "spec 도감", "기술", "가방", "저장"].concat(ext.map((e) => e.label), ["닫기"]), { prompt: "메뉴", cancel: true, grid: true });
+      if (k >= 5 && k < 5 + ext.length) { const r = await ext[k - 5].run(); if (r === "close") return; continue; }
       if (k === 0) await statusPanel();
       else if (k === 1) await dexPanel();
       else if (k === 2) await movesPanel();
@@ -541,10 +550,17 @@
   G.start = async function () {
     buildTiles(); requestAnimationFrame(frame);
     G.mode = "title";
-    const opts = G.hasSave() ? ["이어하기", "새로 시작"] : ["새로 시작"];
-    const k = await G.choose(opts, { prompt: "SPEC 몬스터 골드 — PCIe/CXL 편\nA: 선택  (키보드: Z=A, X=B, 방향키)" });
-    if (opts[k] === "이어하기") { G.load(); G.mode = "field"; showFieldHint(); }
-    else { G.newGame(); G.mode = "field"; G.save(); if (G.onNewGame) runScript(G.onNewGame); }
+    while (true) {
+      const ext = (G.titleExtras || []).filter((e) => !e.cond || e.cond());
+      const base = G.hasSave() ? ["이어하기", "새로 시작"] : ["새로 시작"];
+      const opts = ext.filter((e) => e.top).map((e) => e.label).concat(base, ext.filter((e) => !e.top).map((e) => e.label));
+      const k = await G.choose(opts, { prompt: "SPEC 몬스터 골드 — PCIe/CXL 편\nA: 선택  (키보드: Z=A, X=B, 방향키)" });
+      const e = ext.find((x) => x.label === opts[k]);
+      if (e) { if (await e.run()) { G.mode = "field"; showFieldHint(); return; } continue; }
+      if (opts[k] === "이어하기") { G.load(); G.mode = "field"; showFieldHint(); }
+      else { G.newGame(); G.mode = "field"; G.save(); if (G.onNewGame) runScript(G.onNewGame); }
+      return;
+    }
   };
   G.S = S;
 })();

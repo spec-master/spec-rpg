@@ -47,3 +47,10 @@ body { font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgu
   font-weight: 800; font-size: 20px; box-shadow: 0 3px 0 #500; touch-action: none; }
 .btn.a { right: 0; top: 4px; } .btn.b { left: 4px; top: 46px; }
 @media (min-height: 900px) { #controls { height: 210px; } }
+.form { margin-top: 6px; }
+.fld { width: 100%; font: 13px/1.35 ui-monospace, Menlo, monospace; border: 2px solid #88a070; border-radius: 4px; padding: 6px; background: #fff; color: #102010; -webkit-user-select: text; user-select: text; }
+textarea.fld { height: 92px; resize: none; word-break: break-all; }
+input.fld { font: 16px -apple-system, sans-serif; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.fbtn { flex: 1 1 auto; font: 700 14px -apple-system, sans-serif; padding: 9px 10px; border-radius: 6px; border: 2px solid #305830; background: #fff; color: #203820; text-align: center; text-decoration: none; }
+.fbtn.pri { background: #305830; color: #f8f8e8; }

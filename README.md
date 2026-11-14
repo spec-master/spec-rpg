@@ -37,3 +37,17 @@ js/story.js           맵, NPC, 트레이너, 관장, 스토리 스크립트
 - Link 폭: Configuration 학습 후 Lv3 x2 / Lv5 x4 / Lv8 x8 / Lv12 x16
 - 기술: 레벨 + 관련 개념 학습 둘 다 충족해야 습득
 - 저장: localStorage `specrpg_save_v1`
+
+## 저장 코드 (기기 간 이어하기, 서버 없음)
+- 메뉴 → **저장 코드 내보내기**: `SPEC1.` + base64url([압축flag][CRC32][deflate-raw JSON]) 코드, 복사 / 공유 링크(`#save=코드`)
+- 타이틀 또는 메뉴 → **저장 코드 불러오기**: 붙여넣기 → 체크섬·구조 검증 → 요약 확인 후 덮어쓰기
+- 공유 링크로 열면 타이틀에 「🔗 링크의 저장 코드 불러오기」가 뜸
+- 압축 해제는 CompressionStream 필요(iOS 16.4+)
+
+## 랭킹 (GitHub Issues + Actions, 비밀값 없음)
+- 점수 = Lv×100 + 배지×500 + 도감×30 + 정답×10 + (10문제 이상 답하면) 정확도%×5
+- 메뉴 → 랭킹 → 점수 제출: 닉네임(2~12자, 한글/영문/숫자/_/-) → GitHub 이슈 작성 페이지로 이동(로그인 필요) → Create
+- `.github/workflows/leaderboard.yml` + `scripts/lb-submit.js`가 저장 코드를 다시 디코드·검증해 점수를 재계산하고
+  `data/leaderboard.json`을 갱신, 이슈에 결과를 댓글로 달고 닫음 (GitHub 계정당 1개 기록, 최고점 유지, 10분 제한, 닉네임 중복 방지)
+- 랭킹 보기: raw.githubusercontent.com의 leaderboard.json을 읽어 TOP 20 + 내 순위 표시
+- 백엔드 교체: `js/online.js`의 `LB_ADAPTERS`에 어댑터 추가 후 `LB_CONFIG.adapter` 변경 (`disabled` = '준비 중')
