@@ -35,7 +35,7 @@ async function run(br, w, h, scen) {
     const con = document.getElementById('console'), cr = con.getBoundingClientRect(), qt = document.querySelector('#ctext .qtext');
     const qr = qt && qt.getBoundingClientRect();
     return { mode: window.G.mode, quiz: con.classList.contains('quiz'), q: qt ? qt.textContent : '', text: document.getElementById('ctext').innerText,
-      qVisible: !!qr && qr.height > 0 && qr.top >= cr.top - 1 && qr.bottom <= cr.bottom + 1,
+      qVisible: (() => { const h = document.getElementById('ctext'), hr = h.getBoundingClientRect(); return !!qr && qr.height > 0 && hr.top >= cr.top - 1 && hr.bottom <= cr.bottom + 1 && qr.top >= hr.top - 1 && (qr.bottom <= hr.bottom + 1 || h.scrollHeight > h.clientHeight); })(),
       opts: [...document.querySelectorAll('#clist .opt')].map((e) => ({ t: e.textContent, off: e.classList.contains('off') })),
       battleCls: document.body.classList.contains('battle'), popup: !!document.querySelector('.bpop') };
   });
@@ -97,7 +97,7 @@ async function run(br, w, h, scen) {
         if (!s.q.trim()) fail(`${scen}@${w}: empty question`);
         if (s.opts.length !== 4) fail(`${scen}@${w}: ${s.opts.length} choices`);
         if (!s.qVisible) fail(`${scen}@${w}: question not visible`);
-        const pinned = await pg.evaluate(() => { const c = document.getElementById('console'); c.scrollTop = c.scrollHeight; const q = document.querySelector('#ctext .qtext').getBoundingClientRect(), r = c.getBoundingClientRect(); return q.top >= r.top - 1 && q.bottom <= r.bottom + 1; });
+        const pinned = await pg.evaluate(() => { const c = document.getElementById('console'); c.scrollTop = c.scrollHeight; const q = document.querySelector('#ctext .qtext').getBoundingClientRect(), r = c.getBoundingClientRect(); const h = document.getElementById('ctext'); return q.top >= r.top - 1 && (q.bottom <= r.bottom + 1 || h.scrollHeight > h.clientHeight); });
         if (!pinned) fail(`${scen}@${w}: question scrolled away (not pinned)`);
         const en = s.opts.map((o, i) => (o.off ? -1 : i)).filter((i) => i >= 0);
         let pick = en[Math.floor(Math.random() * en.length)];
