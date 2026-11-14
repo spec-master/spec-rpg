@@ -203,7 +203,7 @@
         intro: ["링크가 흔들리면 Recovery로 다시 맞추지! 덤벼라!"], team: ["lockgolem", "speedgolem", "cfggolem"],
         win: "허허, 재훈련이 필요한 건 나였군.", after: "Recovery.Speed 실패 시엔 원래 속도로 돌아가 다시 시도한다네." }),
       trainer("t_eq", { name: "EQ 연구원", sight: 3, npc: { x: 14, y: 6, dir: "down", look: LOOK.sci },
-        intro: ["Phase 2는 USP Tx, Phase 3은 DSP Tx를 조정! 헷갈리면 지는 거다."], team: ["eq0crystal", "eq2crystal", "eq3crystal"],
+        intro: ["Phase 2는 USP가 DSP Tx를, Phase 3은 DSP가 USP Tx를 조정! 헷갈리면 지는 거다."], team: ["eq0crystal", "eq2crystal", "eq3crystal"],
         win: "Eye가 활짝 열렸군…", after: "64 GT/s 이상 EQ는 TS0 Ordered Set으로 진행된다." })
     ]
   };
@@ -236,12 +236,12 @@
     warps: [{ x: 7, y: 13, to: "town", tx: 9, ty: 1, dir: "down" }, { x: 8, y: 13, to: "town", tx: 10, ty: 1, dir: "down" }, { x: 12, y: 5, to: "tower", tx: 5, ty: 12, dir: "up" },
       { x: 7, y: 0, to: "route1", tx: 6, ty: 18, dir: "up" }, { x: 8, y: 0, to: "route1", tx: 7, ty: 18, dir: "up" }],
     triggers: [7, 8].map((x) => ({ x, y: 1, cond: () => !G.P().badges.includes("l0"), run: async () => {
-      await say(["멈춰! 이 앞 DLL 1번 도로는 LTSSM 마스터만 지나갈 수 있다.", "TLP를 주고받으려면 먼저 Physical Layer가 L0여야 하거든. LTSSM 관장을 이기고 와라."], "경비원"); await G.stepBack();
+      await say(["멈춰! 이 앞 2번 마을(Flit 항구) 가는 길은 LTSSM 마스터만 지나갈 수 있다.", "TLP를 주고받으려면 먼저 Physical Layer가 L0여야 하거든. LTSSM 관장을 이기고 와라."], "경비원"); await G.stepBack();
     } })),
     signs: { "6,4": areaSign("시련의 탑", ["dis", "lb", "hr"], "Disabled · Loopback · Hot Reset. 관장 도전 필수는 아니지만, 경험치와 기술(Hot Reset, Loopback 에코)을 얻을 수 있다.") },
     encounter: { rate: 0.12, table: [["plugblob", 2], ["leadjelly", 2], ["echojelly", 2], ["resetdrake", 1]] },
     npcs: [{ id: "guard1", x: 9, y: 1, dir: "left", look: LOOK.guard, fixed: true, talk: async () => {
-      await say(G.P().badges.includes("l0") ? "LTSSM 마스터 배지 확인! DLL 1번 도로로 지나가도 좋다." : "LTSSM 관장을 이겨야 북쪽 도로를 지날 수 있다.", "경비원"); } }]
+      await say(G.P().badges.includes("l0") ? "LTSSM 마스터 배지 확인! Flit 항구 가는 길로 지나가도 좋다." : "LTSSM 관장을 이겨야 북쪽 도로를 지날 수 있다.", "경비원"); } }]
   };
   G.maps.tower = {
     name: "시련의 탑", border: "Q",
@@ -300,7 +300,7 @@
     npcs: [
       { id: "gymguide", x: 7, y: 10, dir: "left", look: LOOK.guard, talk: async () => {
         const miss = gymMissing();
-        if (G.P().badges.includes("l0")) { await say("LTSSM 마스터! 다음은 DLL이다. 시련의 탑 북쪽으로!", "체육관 안내원"); return; }
+        if (G.P().badges.includes("l0")) { await say("LTSSM 마스터! 다음은 2번 마을 Flit 항구다. 시련의 탑 북쪽으로!", "체육관 안내원"); return; }
         if (!miss.length) { await say(["모든 조건 충족! 관장님께 도전할 수 있다.", "관장전은 Recovery·EQ·전체 LTSSM 문제가 나온다. 어려운 문제(★★ 이상)뿐이니 각오해!"], "체육관 안내원"); return; }
         await say(["어이, 도전자! 관장에게 도전하려면 Lv10 + 핵심 배지 5개(Detect·Polling·Configuration·Recovery·L0)가 필요하다.", "지금 부족한 것:\n" + miss.map((m) => "· " + m).join("\n"), "체육관 안의 트레이너들과는 언제든 수련할 수 있다."], "체육관 안내원");
       } },

@@ -108,7 +108,7 @@ SPEC.MOVES = [
   { id: "hotreset", name: "Hot Reset", lv: 7, req: { s: "hr", n: 3 }, power: 22, effect: "risky",
     desc: "Hot_Reset_Request TS1로 상대를 리셋! [강공격, 하지만 틀리면 받는 피해 1.5배]" },
   { id: "l1nap", name: "L1.2 휴면", lv: 8, req: { s: "l1", n: 4 }, power: 6, effect: "heal", heal: 0.35,
-    desc: "CLKREQ#를 놓고 Refclk까지 끄는 깊은 휴식. [정답 시 약공 + HP 35% 회복]" },
+    desc: "CLKREQ#를 놓고 common mode까지 끄는 깊은 휴식(L1.1/L1.2 모두 Refclk 불필요). [정답 시 약공 + HP 35% 회복]" },
   { id: "acknak", name: "Ack/Nak 재전송", lv: 5, concept: "ack_nak", power: 12, effect: "replay",
     desc: "Nak을 받으면 Replay Buffer에서 다시 보낸다. [틀려도 피해 없이 1회 재시도]" },
   { id: "updatefc", name: "Credit 반환", lv: 6, concept: "fc", power: 6, effect: "heal", heal: 0.35,

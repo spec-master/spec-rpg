@@ -193,7 +193,7 @@
   U.badgeCanvas = function (st, locked) {
     const key = st.id + (st.isMaster ? "_m" : "") + (locked ? "_l" : ""); if (badgeCache[key]) return badgeCache[key];
     const c = document.createElement("canvas"); c.width = c.height = B; const g = c.getContext("2d");
-    const shpName = SHAPE_OF[st.isMaster ? "master" : st.id] || "circle", shp = SHAPE[shpName];
+    const shpName = st.shape && SHAPE[st.shape] && !(st.town === 1 || (st.isMaster && st.id === "l0")) ? st.shape : SHAPE_OF[st.isMaster ? "master" : st.id] || st.shape || "circle", shp = SHAPE[shpName];
     let sym = st.sym === "moon" ? (x, y) => (Math.hypot(x - 6.5, y - 3) < 0.8 || Math.hypot(x - 8.5, y - 6) < 0.6 ? 1 : 0) : shpName === "bolt" || shpName === "star" ? SYM.none : (SYM[st.sym] || SYM.radar);
     if (Array.isArray(sym)) { const bm = sym; sym = (x, y) => { const ch = (bm[Math.round(y)] || "")[Math.round(x)]; return ch === "X" ? 1 : ch === "o" ? 2 : 0; }; }
     const [ox, oy] = SYM_OFF[shpName] || [3, 3];

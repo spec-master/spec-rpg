@@ -5,7 +5,7 @@ const puppeteer = require(process.env.PUPPETEER || 'puppeteer');
 const URL = process.argv[2] || 'http://localhost:8765/';
 const SHOTS = process.env.SHOTS; // 스크린샷 저장 폴더(선택)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const VIEWPORTS = [[390, 844], [375, 667]];
+const VIEWPORTS = process.env.VP ? [process.env.VP.split('x').map(Number)] : [[390, 844], [375, 667]];
 const OLD_SAVE = { map: 'route1', x: 5, y: 5, dir: 'up', lv: 4, xp: 3, hp: 40, chapter: 1, ltssm: 'Polling', gen: 1, width: 1, flags: { metProf: true }, items: { fc_credit: 2 },
   learned: { equalization: 1 }, mastery: {}, moves: ['rxdetect', 'ts1', 'width', 'eq', 'bogus_move'], badges: [], seenQ: {}, wins: 3, playMs: 600000 };
 const OLD_EMPTY = Object.assign({}, OLD_SAVE, { moves: [] });
@@ -13,8 +13,11 @@ const SCEN = {
   fresh: null,
   migrated_v1: OLD_SAVE,
   migrated_v1_nomoves: OLD_EMPTY,
-  mid_all_moves: 'ALL'
+  migrated_v2_proto: Object.assign({}, OLD_SAVE, { ver: 2, map: 'cxlcity', x: 7, y: 7, lv: 14, hp: 100, ltssm: 'L0', badges: ['l0', 'dl'], chapter: 5, sbadges: [], rules: {}, ach: [], met: [] }),
+  mid_all_moves: 'ALL',
+  towns: 'TOWNS'
 };
+const townQ = {};
 let failures = [], quizCount = 0, battles = 0;
 const fail = (m) => { failures.push(m); console.log('  FAIL', m); };
 
@@ -26,7 +29,7 @@ async function run(br, w, h, scen) {
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
   await pg.goto(URL); await pg.evaluate(() => localStorage.clear());
   const sv = SCEN[scen];
-  if (sv && sv !== 'ALL') await pg.evaluate((s) => localStorage.setItem('specrpg_save_v1', JSON.stringify(s)), sv);
+  if (sv && typeof sv === 'object') await pg.evaluate((s) => localStorage.setItem('specrpg_save_v1', JSON.stringify(s)), sv);
   await pg.reload(); await sleep(600);
   const S = () => pg.evaluate(() => {
     const con = document.getElementById('console'), cr = con.getBoundingClientRect(), qt = document.querySelector('#ctext .qtext');
@@ -39,27 +42,38 @@ async function run(br, w, h, scen) {
   const tap = async (i) => { for (let k = 0; k < 3; k++) { try { const els = await pg.$$('#clist .opt'); if (!els[i]) return; await els[i].evaluate((e) => e.scrollIntoView({ block: 'end' })); await sleep(30); await els[i].tap(); return; } catch (e) { if (!/detached|not clickable|Node/.test(e.message)) throw e; await sleep(100); } } };
   // 타이틀
   let s = await S();
-  const want = s.opts.findIndex((o) => o.t === (sv && sv !== 'ALL' ? '이어하기' : '새로 시작'));
+  const want = s.opts.findIndex((o) => o.t === (sv && typeof sv === 'object' ? '이어하기' : '새로 시작'));
   if (want < 0) fail(`${scen}@${w}: title option missing`); else await tap(want);
   for (let i = 0; i < 60; i++) { s = await S(); if (s.mode === 'field' && !s.opts.length && /Lv\d/.test(s.text)) break; await pg.evaluate(() => G.press('A')); await sleep(60); }
   if (sv === 'ALL' || scen === 'fresh') { /* fresh도 기술 확인 */ }
   if (sv === 'ALL') await pg.evaluate(() => { const P = G.P(); P.lv = 12; P.hp = G.maxHP(); P.flags.metProf = true; P.moves = G.S.MOVES.map((m) => m.id); P.items = { fc_credit: 50, replay_buf: 30, msix_table: 1, retimer: 1, bar_key: 1 }; });
+  if (sv === 'TOWNS') await pg.evaluate(() => { const P = G.P(), L = G.S.LTSSM; P.lv = 70; P.hp = G.maxHP(); P.flags.metProf = true; P.moves = G.S.MOVES.map((m) => m.id);
+    P.items = { fc_credit: 50, replay_buf: 30 }; P.badges = ['l0'].concat(L.TOWNS.map((T) => 'g' + T.n)); });
   const info = await pg.evaluate(() => ({ moves: G.P().moves.slice(), map: G.P().map }));
   if (!info.moves.length) fail(`${scen}@${w}: no moves after load`);
+  if (scen === 'migrated_v2_proto' && info.map !== 't2') fail(`${scen}@${w}: old prototype map not migrated (${info.map})`);
   console.log(`[${w}x${h}] ${scen}: moves=${info.moves.length} map=${info.map}`);
+  if (sv === 'TOWNS') await pg.evaluate(() => { window.__TOWNS = 1; });
   const plan = await pg.evaluate(() => {
     const L = G.S.LTSSM, out = [];
-    L.LMON.filter((m) => !m.boss).forEach((m) => out.push({ kind: 'wild', team: [m.id] }));
+    if (window.__TOWNS) { L.TOWNS.forEach((T) => { const fm = L.LMON.filter((m) => m.town === T.n && !m.boss);
+        [0, Math.floor(fm.length / 2), fm.length - 1].forEach((i) => out.push({ kind: 'wild', team: [fm[i].id], map: 't' + T.n + (i ? '_f3' : '_f2'), town: T.n }));
+        out.push({ kind: 'boss', trainer: T.leader, team: T.boss, fams: T.famIds, minD: 2, maxD: 3, xp: 90, map: 't' + T.n + '_gym', town: T.n }); });
+      out.push({ kind: 'boss', trainer: ['챔피언', 'Champion'], team: L.CHAMP, fams: L.STATES.filter((s) => s.core).map((s) => s.id), minD: 2, maxD: 3, map: 'champ', town: 11 });
+      return out; }
+    L.LMON.filter((m) => !m.boss && (m.town || 1) === 1).forEach((m) => out.push({ kind: 'wild', team: [m.id] }));
     out.push({ kind: 'boss', trainer: '관장', team: ['kinggolem', 'eqqueen', 'ltssmdrake'], minD: 2, maxD: 3, xp: 90 });
     Object.entries(G.S.MONSTERS).filter(([, m]) => !m.ltssm).slice(0, 6).forEach(([id, m]) => out.push({ kind: 'trainer', trainer: 'T', team: [id], chapters: [m.ch] }));
     out.push({ kind: 'trainer', trainer: 'T', team: ['detectmon'] }); // chapters 없음 → LTSSM 폴백
     return out;
   });
-  const N = sv === 'ALL' ? plan.length : 6;
+  const N = sv === 'ALL' || sv === 'TOWNS' ? plan.length : 6;
   let moveCursor = 0, itemCursor = 0, usedMoves = new Set(), usedItems = new Set();
   for (let bi = 0; bi < N; bi++) {
     const opt = plan[bi % plan.length]; battles++;
-    await pg.evaluate((o) => { G.P().hp = G.maxHP(); G.runScript(() => G.battle(o)); }, opt);
+    for (let k = 0; k < 80 && (await pg.evaluate(() => G.busy)); k++) { await pg.evaluate(() => G.press('A')); await sleep(80); }
+    if (await pg.evaluate(() => G.busy)) fail(`${scen}@${w}: still busy before battle ${opt.team}`);
+    await pg.evaluate((o) => { G.P().hp = G.maxHP(); G.runScript(async () => { if (o.map) await G.warp(o.map, 4, 6, 'up'); window.__qs = []; return G.battle(o); }); }, opt);
     await sleep(500);
     let steps = 0, turns = 0, lastSig = '', same = 0;
     while (steps++ < 2500) {
@@ -70,6 +84,8 @@ async function run(br, w, h, scen) {
       if (s.popup) { await sleep(750); await pg.evaluate(() => G.press('A')); await sleep(300); continue; }
       if (s.quiz) {
         quizCount++;
+        if (opt.town && opt.town <= 10) { const qt = await pg.evaluate(() => G.lastQ && (G.lastQ.town || 1)); if (qt !== opt.town) fail(`${scen}@${w}: town ${opt.town} battle asked town-${qt} question`); }
+        if (opt.town) townQ[opt.town] = (townQ[opt.town] || 0) + 1;
         if (!s.q.trim()) fail(`${scen}@${w}: empty question`);
         if (s.opts.length !== 4) fail(`${scen}@${w}: ${s.opts.length} choices`);
         if (!s.qVisible) fail(`${scen}@${w}: question not visible`);
@@ -121,6 +137,7 @@ async function run(br, w, h, scen) {
   const br = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox'] });
   for (const [w, h] of VIEWPORTS) for (const sc of Object.keys(SCEN).filter((k) => !process.env.ONLY || process.env.ONLY.split(',').includes(k))) { try { await run(br, w, h, sc); } catch (e) { fail(`${sc}@${w}: exception ${e.message}`); } }
   await br.close();
+  console.log("quizzes per town", JSON.stringify(townQ));
   console.log(`\nbattles=${battles} quizzes=${quizCount} failures=${failures.length}`);
   process.exit(failures.length ? 1 : 0);
 })();

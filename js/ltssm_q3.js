@@ -19,7 +19,7 @@ var LTSSM_Q3 = [
 ["l1","a3",1,"L1에서 L0로 돌아가는 경로는?","L1 → Recovery → L0","L1 → L0 직행 (FTS)","L1 → Detect → L0","L1 → Configuration → L0","L1 탈출은 Recovery를 거친다. FTS로 바로 L0에 가는 것은 L0s."],
 ["l1","a3",3,"2.5 GT/s가 아닐 때 L1.Idle에서 Recovery로 가기 전 최소 체류 시간은?","40 ns","20 ns","2 ms","100 ms","EI exit나 지시가 있어도 비-2.5 GT/s면 L1.Idle에 최소 40 ns 머문 뒤 Recovery."],
 ["l1","a4",2,"L1.1/L1.2 진입·탈출에 쓰는 신호는?","CLKREQ# (양방향 open-drain)","WAKE#","PERST#","Beacon","L1 PM Substates는 CLKREQ#로 들어가고 나온다. EI exit 감지가 요구되지 않는다."],
-["l1","a4",2,"L1.1과 L1.2의 차이는?","L1.2는 Refclk을 끄고 공통모드도 유지하지 않는다","L1.1이 더 깊다","L1.2는 TLP 전송 가능","차이 없음","L1.1은 공통모드 유지, L1.2는 Refclk off·공통모드 off까지 가능해 더 깊고 탈출이 느리다."],
+["l1","a4",2,"L1.1과 L1.2의 차이는?","L1.1은 common mode 전압을 유지하고, L1.2는 유지하지 않아도 된다","L1.1이 더 깊다","L1.2는 TLP 전송 가능","차이 없음","L1.1·L1.2 모두 CLKREQ#로 진입/탈출하고 Refclk을 끌 수 있다(L1.0 외에는 Refclk 불필요). L1.1은 common mode를 유지해야 하고, L1.2는 유지하지 않아도 되어 더 깊지만 탈출에 TPOWER_ON·common mode 복구 시간이 든다. ASPM L1.2는 LTR 지원 필요."],
 ["l1","a4",3,"ASPM L1.2를 지원하는 Port에 필요한 기능은?","LTR (Latency Tolerance Reporting)","MSI-X","ECRC","ARI","ASPM L1.2 진입은 LTR 임계 비교가 들어가므로 LTR 지원이 필요하다."],
 ["l1","a5",3,"L1.2의 TPOWER_OFF(CLKREQ# deassert → L1.2.Idle)의 최대값은?","2 µs","4 µs","100 ns","3100 µs","TPOWER_OFF max 2 µs, TL1.2 최소 체류 4 µs, TPOWER_ON은 0–3100 µs 프로그래밍."],
 ["l1","a5",3,"L1.2에서 CLKREQ#가 inactive로 유지되어야 하는 최소 시간 TL1.2는?","4 µs","2 µs","40 ns","1 ms","TL1.2 = 4 µs(min)."],
@@ -47,7 +47,7 @@ var LTSSM_Q3 = [
 /* ---------- Loopback ---------- */
 ["lb","lb1",1,"Loopback의 역할 구분은?","Lead와 Follower","Host와 Device","Master와 Slave","USP만","Loopback은 테스트용이다. Lead가 패턴을 보내고 Follower가 받은 그대로 되돌려 보낸다."],
 ["lb","lb1",2,"Loopback.Entry에서 LinkUp은?","0b","1b 유지","소프트웨어가 결정","Gen에 따라 다름","Loopback.Entry에서 LinkUp=0b. 수신 TS의 Link/Lane 번호도 무시한다."],
-["lb","lb2",2,"Follower가 Loopback으로 들어가는 조건은?","Loopback_Request가 주장된 TS1 2연속 수신","TS1 8연속","EIOS 수신","Beacon 수신","Loopback_Request TS1을 2개 연속 받으면 Follower로 Loopback에 들어간다."],
+["lb","lb2",2,"Follower가 Loopback으로 들어가는 조건은?","Loopback_Request가 주장된 TS1 2연속 수신","TS1 8연속","EIOS 수신","Beacon 수신","Configuration.Linkwidth.Start(또는 Non-Flit Recovery.Idle)에서 Loopback_Request TS1을 2개 연속 받으면 Follower로 Loopback에 들어간다. Flit Mode의 Recovery 경로에서는 Recovery.RcvrCfg에서 받은 TS2 8연속에 Loopback_Request가 실려 있으면 Follower가 된다."],
 ["lb","lb3",1,"Loopback.Active에서 Follower가 하는 일은?","받은 심볼을 그대로 되돌려 보낸다","TLP를 처리한다","Credit을 반환한다","EQ를 수행한다","Follower는 수신 심볼을 echo해 Lead가 비교·측정할 수 있게 한다."],
 ["lb","lb4",3,"Loopback.Entry에서 Active 진입에 실패하면?","구현 정의 timeout(100 ms 미만) 후 Loopback.Exit","24 ms 후 Detect","무한 대기","Recovery","표준은 ‘implementation specific timeout of less than 100 ms’만 정한다(하한 없음)."],
 ["lb","lb5",2,"Loopback.Exit 다음 state는?","Detect (양쪽 모두)","L0","Recovery","Polling","Loopback.Exit 후 양쪽 모두 Detect로 간다."],
@@ -57,7 +57,7 @@ var LTSSM_Q3 = [
 
 /* ---------- Hot Reset ---------- */
 ["hr","h1",1,"Hot Reset을 요청하는 방법은?","Hot_Reset_Request가 주장된 TS1을 구성된 Link/Lane 번호로 송신","PERST# 신호","Config Write 하나","EIOS 송신","개시 측은 모든 Lane에서 Hot_Reset_Request TS1을 보낸다. PERST#는 Fundamental Reset."],
-["hr","h1",2,"보통 Hot Reset을 개시하는 쪽과 Upstream Port가 진입하는 곳은?","Downstream Port가 개시, USP는 Recovery.Idle에서 TS1을 받아 진입","USP가 개시","Retimer가 개시","Detect에서만 진입","DSP(예: 소프트웨어 Secondary Bus Reset)가 개시하고, USP는 Recovery.Idle에서 Hot Reset TS1을 받아 들어간다."],
+["hr","h1",2,"보통 Hot Reset을 개시하는 쪽과 Upstream Port가 진입하는 곳은?","Downstream Port가 개시, USP는 Recovery.Idle에서 TS1을 받아 진입","USP가 개시","Retimer가 개시","Detect에서만 진입","DSP(예: Secondary Bus Reset)가 개시한다. Non-Flit Mode에서는 USP가 Recovery.Idle에서 Hot_Reset_Request TS1 2연속을 받아 들어가고, Flit Mode에서는 Recovery.RcvrCfg의 TS2 8연속에 실린 Hot_Reset_Request로 Recovery.Idle에서 Hot Reset으로 간다."],
 ["hr","h2",1,"Hot Reset TS1을 몇 개 연속 받으면 LinkUp=0b가 되나?","2연속","8연속","16연속","1024개","Hot Reset은 2연속. 8연속은 다른 핸드셰이크 조건이다."],
 ["hr","h2",2,"Hot Reset 이후 다음 state는(유지 지시가 없을 때)?","Detect","L0","Recovery","Polling","2연속 수신 후 LinkUp=0b, 상위가 유지를 지시하지 않으면 Detect."],
 ["hr","h3",2,"Hot Reset TS1 2연속을 못 받으면?","2 ms timeout 후 Detect","24 ms 후 Recovery","영원히 대기","즉시 L0","2 ms timeout → Detect."],
@@ -79,14 +79,14 @@ var LTSSM_Q3 = [
 ["l0s","s4",2,"Rx_L0s.FTS에서 L0로 가는 신호(128b/130b)는?","SDS Ordered Set 수신","SKP 1개","TS2","EIOS","Rx는 8b/10b면 SKP, 128b/130b면 SDS를 받고 L0로 간다."],
 ["l0s","s5",3,"Flit Mode TS1 Symbol 3 자리에는?","EFM_CNTL1","N_FTS","Link Number","Rate ID","Flit Mode에서는 L0s가 없으므로 N_FTS 자리가 EFM_CNTL1로 쓰인다."],
 ["l1","a2",2,"L1.Entry에서 Tx 공통모드 전압은?","DC 공통모드 규격을 유지한다","끈다","Beacon 레벨","정의 없음","L1.Entry는 Tx를 EI로 보내되 DC 공통모드 전압은 규격 범위로 유지(L1.2는 예외)."],
-["l1","a6",2,"L1.Idle에 들어가거나 나올 때 CLKREQ#를 쓰는 PM Substate는?","L1.0이어야 하고, L1.1/L1.2 전이는 그 뒤 CLKREQ#로","항상 L1.2","CLKREQ# 미사용","WAKE#로","USP는 Link가 L1.0에 들어가기 전에 CLKREQ#를 deassert하면 안 된다."],
+["l1","a6",2,"L1 PM Substates에서 L1.1/L1.2로 들어가는 출발점과 그 전이 신호는?","L1.0에서 출발하고, CLKREQ# deassert로 L1.1/L1.2에 들어간다","L1.2에서 출발하고 WAKE#로 전이","L0에서 바로 CLKREQ#로 전이","CLKREQ#를 쓰지 않고 EIOS로 전이","L1.Idle 진입·탈출 시 L1 PM Substate는 L1.0이어야 한다. L1.0에서 CLKREQ#가 deassert되면 enable 비트·LTR 조건에 따라 L1.1/L1.2로 간다. USP는 Link가 L1.0에 들어가기 전에 CLKREQ#를 deassert하면 안 된다.","L1.Idle에 들어가거나 나올 때 CLKREQ#를 쓰는 PM Substate는?"],
 ["l2","b4",2,"L2.Idle의 USP가 EI exit를 보고 가는 state는?","Detect","L0","Recovery","Polling","USP는 predetermined Lane set에서 EI exit을 보면 Detect."],
 ["l2","b5",3,"L2.Idle에서 Tx가 유지해야 하는 것은?","Electrical Idle 최소 TTX-IDLE-MIN","TS1 연속 송신","SKP 주기 송신","공통모드 off 금지","Tx는 TTX-IDLE-MIN 이상 EI. Rx는 1 ms 안에 ZRX-DC."],
 ["dis","x1",2,"Configuration에서 Disabled로 가는 조건은?","Disable_Link_Request TS1 2연속 수신 또는 상위 지시","24 ms timeout","EIOS 수신","Beacon","TS1 2연속(Disable 비트) 수신 또는 상위 계층 지시."],
 ["dis","x2",3,"Disabled 진입 후 TS1을 보낸 뒤 순서는?","EIOSQ 송신 → Electrical Idle","곧바로 Detect","TS2 송신","SDS 송신","TS1 16~32 → EIOSQ → EI."],
 ["dis","x3",3,"Disabled에서 LinkUp을 Clear하면 DLL은?","DL_Down(DL_Inactive)으로","DL_Active 유지","DL_Init","영향 없음","LinkUp=0b는 DLL에 Link 끊김을 알린다."],
-["lb","lb2",2,"Loopback Follower가 될 수 있는 경로는?","Configuration/Recovery에서 Loopback 비트 TS1 2연속 수신","L1에서 Beacon","Detect에서 직접","Disabled에서","Loopback 요청 TS1 2연속 수신 시 Follower로 Loopback.Entry."],
-["lb","lb3",2,"Loopback.Active에서 Lead가 끝내려면?","EIOS 송신으로 Loopback.Exit","Hot Reset TS1","TS2 송신","24 ms 대기","Lead가 EIOS를 보내고 Exit, Follower도 EIOS를 받으면 Exit."],
+["lb","lb2",2,"Loopback Follower가 될 수 있는 경로는?","Configuration.Linkwidth.Start(또는 Recovery)에서 Loopback_Request를 받음","L1에서 Beacon","Detect에서 직접","Disabled에서","Configuration.Linkwidth.Start나 Non-Flit Recovery.Idle에서는 Loopback_Request TS1 2연속, Flit Mode Recovery에서는 RcvrCfg TS2 8연속의 Loopback_Request로 Follower가 되어 Loopback.Entry로 간다."],
+["lb","lb3",2,"Loopback.Active에서 Lead가 끝내려면?","directed되면 Loopback.Exit로 가서 EIOS를 보낸다","Hot Reset TS1","TS2 송신","24 ms 대기","Lead는 상위 지시로 Loopback.Exit에 들어가 EIOS(2.5 GT/s 전용이면 1개, 그 외 8연속)를 보내고 2 ms EI. Follower는 directed이거나 EIOS 4연속을 받으면 Loopback.Exit로 간다."],
 ["lb","lb4",3,"Loopback.Entry 실패 timeout의 표준 하한은?","정해져 있지 않다 (100 ms 미만만 규정)","24 ms","2 ms","12 ms","‘less than 100 ms’만 규정, 하한 없음."],
 ["hr","h4",2,"Hot Reset이 Switch 아래 장치까지 리셋되는 이유는?","Switch USP가 Downstream Port로 Hot Reset을 전파","PERST# 연결","Config 재시작","Beacon","Switch USP는 Hot Reset을 받으면 하위 Downstream Port들을 가능한 빨리 Hot Reset으로 보낸다."]
 ];

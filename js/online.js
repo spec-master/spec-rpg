@@ -120,7 +120,7 @@
     items.push({ label: `현재 점수 ${mine.score}점`, desc: scoreDesc(mine) });
     await G.panel(`🏆 랭킹 · 업데이트 ${board.updated ? new Date(board.updated).toLocaleString("ko-KR") : "-"}`, items);
   }
-  const scoreDesc = (m) => `레벨 ${m.parts.level} + 관장 배지 ${m.parts.badges} + state 배지 ${m.parts.sbadges} + 규칙 ${m.parts.rules} + 도감 ${m.parts.dex} + 정답 ${m.parts.correct} + 정확도 ${m.parts.accuracy}\n(Lv×100, 관장 배지×500, state 배지×200, 규칙×15, 도감×30, 정답×10, 10문제 이상 답하면 정확도%×5)`;
+  const scoreDesc = (m) => `레벨 ${m.parts.level} + 관장 배지 ${m.parts.badges}${m.parts.champ ? ` + 챔피언 ${m.parts.champ}` : ""} + state 배지 ${m.parts.sbadges} + 규칙 ${m.parts.rules} + 도감 ${m.parts.dex} + 정답 ${m.parts.correct} + 정확도 ${m.parts.accuracy}\n(Lv×100, 관장 배지×500, state 배지×200, 규칙×15, 도감×30, 정답×10, 10문제 이상 답하면 정확도%×5)`;
 
   async function submitScore() {
     const ad = LB(); if (!ad.enabled) { await G.say("🏆 랭킹은 준비 중입니다."); return; }

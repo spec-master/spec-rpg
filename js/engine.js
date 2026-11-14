@@ -106,6 +106,19 @@
   /* ---------------- 상태 ---------------- */
   const G = (window.G = {});
   G.maps = {}; G.mode = "title"; G.busy = false;
+  /* ---- 언어 (ko / en) ---- */
+  const LANG_KEY = "specrpg_lang";
+  G.lang = (() => { try { return localStorage.getItem(LANG_KEY) || "ko"; } catch (e) { return "ko"; } })();
+  G.setLang = (l) => { G.lang = l === "en" ? "en" : "ko"; try { localStorage.setItem(LANG_KEY, G.lang); } catch (e) {} document.documentElement.lang = G.lang; };
+  const t = (ko, en) => (G.lang === "en" && en != null ? en : ko); G.t = t;
+  const NM = (m) => (m ? t(m.name, m.en) : ""); G.nm = NM;
+  const SN = (st) => (st ? t(st.name, st.en) : ""); G.sn = SN;
+  const IN = (it) => (it ? t(it.name, it.en) : ""), ID = (it) => (it ? t(it.desc, it.descEn) : "");
+  const MD = (m) => t(m.desc, m.descEn);
+  const RT = (rid) => { const r = S.LTSSM.RULES[rid]; return r ? t(r.text, r.en) : rid; };
+  const TAGC = { PCIe: "pc", CXL: "cx", "공통": "cm", "CXL/공통": "cx" };
+  const tagHTML = (tg) => tg ? `<span class="tag t${TAGC[tg] || "pc"}">${tg === "공통" ? t("공통", "Common") : tg === "CXL/공통" ? t("CXL/공통", "CXL/Common") : tg}</span>` : "";
+  G.tagHTML = tagHTML;
   let P = null; // 저장되는 플레이어 상태
   const SAVE_KEY = "specrpg_save_v1";
   function newState() {
@@ -122,8 +135,12 @@
     P.moves = P.moves.filter((m, i, a) => S.MOVES.some((x) => x.id === m) && a.indexOf(m) === i);
     if (!P.moves.includes(BASE_MOVE)) P.moves.unshift(BASE_MOVE);
     P.st = Object.assign({ cs: 0, bs: 0, pf: 0 }, P.st);
+    { const ids = new Set(S.LTSSM.LQ.map((q) => q.id).concat(S.QUESTIONS.map((q) => q.id))); Object.keys(P.seenQ).forEach((k) => { if (!ids.has(k)) delete P.seenQ[k]; }); }
+    P.met = P.met.filter((m) => S.MONSTERS[m]);
     if (!(P.lv >= 1)) P.lv = 1; if (!(P.hp >= 0)) P.hp = maxHP(); P.hp = Math.min(P.hp, maxHP());
   }
+  /* 없어진 맵(구버전 프로토타입 등)에 저장된 위치 → 가까운 허브로 이주 */
+  function fixMap() { if (G.maps[P.map]) return; const alt = G.mapAlias && G.mapAlias(P.map, P); if (alt && G.maps[alt[0]]) { [P.map, P.x, P.y] = alt; } else { P.map = "town"; P.x = 9; P.y = 13; } }
   G.sanitize = () => sanitize();
   G.P = () => P;
   const maxHP = () => 30 + 6 * (P.lv - 1);
@@ -134,10 +151,10 @@
   G.hasItem = (k) => (P.items[k] || 0) > 0;
   G.save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); } catch (e) {} };
   G.hasSave = () => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };
-  G.load = () => { try { let s = JSON.parse(localStorage.getItem(SAVE_KEY)); const r = S.LTSSM.migrate(s); s = r.P; P = Object.assign(newState(), s); sanitize(); if (!G.maps[P.map]) { P.map = "town"; P.x = 9; P.y = 13; } G.justMigrated = r.migrated; return true; } catch (e) { console.warn("load failed", e); P = newState(); return false; } };
+  G.load = () => { try { let s = JSON.parse(localStorage.getItem(SAVE_KEY)); const r = S.LTSSM.migrate(s); s = r.P; P = Object.assign(newState(), s); sanitize(); fixMap(); G.justMigrated = r.migrated; return true; } catch (e) { console.warn("load failed", e); P = newState(); return false; } };
   G.newGame = () => { P = newState(); sanitize(); };
   G.newState = newState;
-  G.setState = (s) => { P = Object.assign(newState(), s); sanitize(); if (!G.maps[P.map]) { P.map = "town"; P.x = 9; P.y = 13; } mv = null; };
+  G.setState = (s) => { P = Object.assign(newState(), s); sanitize(); fixMap(); mv = null; };
   G.setHandler = (h) => { handler = h; };
 
   /* ---------------- 입력 ---------------- */
@@ -167,7 +184,9 @@
   const heldDir = () => (lastDir && held[lastDir] ? lastDir : ["up", "down", "left", "right"].find((d) => held[d]) || null);
 
   /* ---------------- 대화 / 선택 UI ---------------- */
-  function setQuiz(on) { elConsole.classList.toggle("quiz", !!on); }
+  function setQuiz(on) { elConsole.classList.toggle("quiz", !!on);
+    // 고정 질문이 콘솔을 다 덮지 않도록: 작은 화면에서는 질문 영역을 콘솔 높이의 55%로 제한(질문 자체 스크롤)
+    elText.style.maxHeight = on ? Math.max(48, Math.floor(elConsole.clientHeight * 0.55)) + "px" : ""; elText.style.overflowY = on ? "auto" : ""; }
   function clearConsole() { elText.textContent = ""; elSub.innerHTML = ""; elList.innerHTML = ""; elList.className = ""; elName.textContent = ""; elArrow.classList.remove("on"); setQuiz(false); elConsole.scrollTop = 0; }
   /* v3.1: 글자 축소(fitConsole) 제거. 퀴즈는 질문(#ctext)을 sticky로 고정하고 보기만 스크롤. */
   function ensureVisible(el) {
@@ -271,7 +290,7 @@
 
   async function runScript(fn) { if (G.busy) return; G.busy = true; try { await fn(); } catch (e) { console.error(e); } G.busy = false; clearConsole(); showFieldHint(); G.save(); }
   G.runScript = runScript;
-  function showFieldHint() { if (G.mode !== "field") return; clearConsole(); const m = curMap(); elName.textContent = m.name; elText.textContent = `${statusLine()}\n방향키 이동 · A 조사/대화 · B/START 메뉴`; }
+  function showFieldHint() { if (G.mode !== "field") return; clearConsole(); const m = curMap(); elName.textContent = t(m.name, m.en); elText.textContent = `${statusLine()}\n${t("방향키 이동 · A 조사/대화 · B/START 메뉴", "D-pad move · A talk/check · B/START menu")}`; }
   G.showFieldHint = showFieldHint;
   function statusLine() { return `Lv${P.lv}  HP ${P.hp}/${maxHP()}  ·  ${P.ltssm}  Gen${P.gen} x${P.width}`; }
 
@@ -355,7 +374,7 @@
       const sh = B.eShake > 0 ? (B.eShake-- % 4 < 2 ? 3 : -3) : 0;
       if (!(B.eBlink > 0 && (B.eBlink-- % 6) < 3)) ctx.drawImage(monSprite(B.enemy.id), 98 + sh + B.eSlide, 14);
       ctx.fillStyle = "#203820"; ctx.fillRect(4, 6, 78, 26); ctx.fillStyle = "#f8f8e8"; ctx.fillRect(5, 7, 76, 24);
-      text(B.enemy.name, 8, 16); text("HP", 8, 26, 6); hpBar(20, 22, 56, B.ehp, B.emax);
+      text(NM(B.enemy), 8, 16); text("HP", 8, 26, 6); hpBar(20, 22, 56, B.ehp, B.emax);
     }
     const psh = B.pShake > 0 ? (B.pShake-- % 4 < 2 ? 3 : -3) : 0;
     ctx.save(); ctx.translate(18 + psh, 70); ctx.scale(3, 3); drawPerson(ctx, 0, 0, "up", 0, { hair: "#5a3018", shirt: "#e03030", pants: "#3050a0", hat: "#e03030" }); ctx.restore();
@@ -406,7 +425,7 @@
   const L = (id) => !!P.learned[id];
   const LT_ORDER = ["Detect", "Polling", "Configuration", "L0"];
   G.setLTSSM = async function (st, msg) { if (LT_ORDER.indexOf(st) <= LT_ORDER.indexOf(P.ltssm)) return; P.ltssm = st; await G.say(msg || `🔗 LTSSM 상태가 ${st}(으)로 전이했다!`); await G.checkGrowth(); };
-  const moveReqText = (m) => m.req ? `「${stateOf(m.req.s).name}」 규칙 ${m.req.n}개 습득` : m.concept ? `「${S.CONCEPTS[m.concept].name}」 개념 학습` : "";
+  const moveReqText = (m) => m.req ? t(`「${SN(stateOf(m.req.s))}」 규칙 ${m.req.n}개 습득`, `${m.req.n} rules of ${SN(stateOf(m.req.s))}`) : m.concept ? `「${S.CONCEPTS[m.concept].name}」 개념 학습` : "";
   const moveReqMet = (m) => m.req ? stateDone(m.req.s) >= m.req.n : m.concept ? L(m.concept) : true;
   G.checkGrowth = async function () {
     // LTSSM 진행 = state 배지
@@ -434,22 +453,23 @@
     }
     for (const mo of S.MOVES) {
       if (P.moves.includes(mo.id)) continue;
-      if (P.lv >= mo.lv && moveReqMet(mo)) { P.moves.push(mo.id); window.LUI && LUI.sfx("rule"); await G.say(`✨ Link는 새 기술 「${mo.name}」을(를) 익혔다!\n${mo.desc}`); }
+      if (P.lv >= mo.lv && moveReqMet(mo)) { P.moves.push(mo.id); window.LUI && LUI.sfx("rule"); await G.say(t(`✨ Link는 새 기술 「${mo.name}」을(를) 익혔다!`, `✨ Link learned ${mo.name}!`) + `\n${MD(mo)}`); }
     }
   };
   G.gainXP = async function (n, note) {
-    P.xp += n; await G.say(`경험치 ${n}을(를) 얻었다!${note ? "\n" + note : ""}`);
+    P.xp += n; await G.say(t(`경험치 ${n}을(를) 얻었다!`, `Gained ${n} EXP!`) + (note ? "\n" + note : ""));
     while (P.xp >= xpNeed(P.lv)) {
       P.xp -= xpNeed(P.lv); P.lv++; P.hp = Math.min(maxHP(), P.hp + 6);
       window.LUI && LUI.sfx("levelup"); levelFx();
-      await G.say(`🎉 레벨 업! Lv${P.lv}  (최대 HP ${maxHP()})${P.lv === 10 ? "\n🏟 Lv10! 핵심 배지를 모으면 LTSSM 관장에게 도전할 수 있다." : ""}`);
+      const gl = (S.LTSSM.TOWNS || []).find((T) => T.gymLv === P.lv);
+      await G.say(t(`🎉 레벨 업! Lv${P.lv}  (최대 HP ${maxHP()})`, `🎉 Level up! Lv${P.lv}  (max HP ${maxHP()})`) + (P.lv === 10 ? t("\n🏟 Lv10! 핵심 배지를 모으면 LTSSM 관장에게 도전할 수 있다.", "\n🏟 Lv10! Collect the core badges to challenge the LTSSM leader.") : gl ? t(`\n🏟 Lv${P.lv}! ${gl.ko} 관장 도전 레벨 달성.`, `\n🏟 Lv${P.lv}! Level reached for the ${gl.en} leader.`) : ""));
     }
     const blocked = S.MOVES.find((m) => !P.moves.includes(m.id) && P.lv >= m.lv && !moveReqMet(m) && m.req);
     await G.checkGrowth(); await G.checkAch();
-    if (blocked && !moveReqMet(blocked) && Math.random() < 0.5) await G.say(`💡 「${blocked.name}」: 레벨은 충분! ${moveReqText(blocked)}이 필요하다.`);
+    if (blocked && !moveReqMet(blocked) && Math.random() < 0.5) await G.say(t(`💡 「${blocked.name}」: 레벨은 충분! ${moveReqText(blocked)}이 필요하다.`, `💡 ${blocked.name}: level OK! Needs ${moveReqText(blocked)}.`));
   };
   function levelFx() { const sc = $("screen"); const d = document.createElement("div"); d.className = "lvfx"; d.textContent = "LEVEL UP!"; sc.appendChild(d); setTimeout(() => d.remove(), 1400); }
-  G.giveItem = async function (id, n = 1, silent) { P.items[id] = (P.items[id] || 0) + n; if (!silent) await G.say(`🎒 「${S.ITEMS[id].name}」 ×${n}을(를) 받았다!\n${S.ITEMS[id].desc}`); };
+  G.giveItem = async function (id, n = 1, silent) { P.items[id] = (P.items[id] || 0) + n; if (!silent) await G.say(t(`🎒 「${IN(S.ITEMS[id])}」 ×${n}을(를) 받았다!`, `🎒 Got ${IN(S.ITEMS[id])} ×${n}!`) + `\n${ID(S.ITEMS[id])}`); };
   G.heal = () => { P.hp = maxHP(); };
   G.addBadge = (b) => { if (!P.badges.includes(b)) P.badges.push(b); };
 
@@ -459,11 +479,11 @@
     if (before || !ruleOK(rid)) return;
     const r = LT.RULES[rid], st = stateOf(r.state);
     window.LUI && LUI.sfx("rule");
-    window.LUI && LUI.toast(`📜 규칙 습득 <b>${st.name}</b> ${stateDone(st.id)}/${stateTot(st.id)}<br><small>${r.text}</small>`, "rule");
+    window.LUI && LUI.toast(`📜 ${t("규칙 습득", "Rule learned")} <b>${SN(st)}</b> ${stateDone(st.id)}/${stateTot(st.id)}<br><small>${RT(rid)}</small>`, "rule");
     if (stateDone(st.id) === stateTot(st.id) && !hasSB(st.id)) {
       P.sbadges.push(st.id);
       await sleep(300);
-      await LUI.badgePopup(st, `${st.name} 배지 획득!`, `${st.name}의 규칙 ${stateTot(st.id)}개를 모두 익혔다`);
+      await LUI.badgePopup(st, t(`${SN(st)} 배지 획득!`, `${SN(st)} badge!`), t(`${SN(st)}의 규칙 ${stateTot(st.id)}개를 모두 익혔다`, `Learned all ${stateTot(st.id)} rules of ${SN(st)}`));
       clearConsole();
       await G.checkGrowth();
     }
@@ -475,13 +495,14 @@
     first_win: () => P.wins >= 1, streak5: () => P.st.bs >= 5, streak10: () => P.st.bs >= 10, streak25: () => P.st.bs >= 25,
     c50: () => totals().ok >= 50, c100: () => totals().ok >= 100, c300: () => totals().ok >= 300,
     perfect1: () => P.st.pf >= 1, perfect10: () => P.st.pf >= 10, first_badge: () => P.sbadges.length >= 1, det_master: () => hasSB("det"),
-    core5: () => LT.CORE.every(hasSB), all_states: () => LT.STATES.every((s) => hasSB(s.id)), lv10: () => P.lv >= 10,
+    core5: () => LT.CORE.every(hasSB), all_states: () => LT.STATES.filter((s) => (s.town || 1) === 1).every((s) => hasSB(s.id)), lv10: () => P.lv >= 10,
     gym_win: () => !!P.flags.beat_leader1, gym_nodmg: () => !!P.flags.gym_nodmg, q20: () => totals().mq >= 20,
-    dex_all: () => LT.LMON.filter((m) => !m.boss).every((m) => P.met.includes(m.id))
+    dex_all: () => LT.LMON.filter((m) => !m.boss && (m.town || 1) === 1).every((m) => P.met.includes(m.id))
   };
   G.checkAch = async function () {
     for (const a of LT.ACH) {
-      if (P.ach.includes(a.id) || !ACH_CHECK[a.id] || !ACH_CHECK[a.id]()) continue;
+      const chk = ACH_CHECK[a.id] || (a.test && (() => a.test(P)));
+      if (P.ach.includes(a.id) || !chk || !chk()) continue;
       P.ach.push(a.id); if (!P.title) P.title = a.title;
       window.LUI && (LUI.sfx("ach"), LUI.toast(`🏆 업적 「${a.name}」<br><small>칭호 「${a.title}」 획득</small>`, "ach"));
       await sleep(250);
@@ -512,7 +533,7 @@
     let q = null;
     try { q = pickQuestion0(opt, m); } catch (e) { console.error("pickQuestion", e); }
     if (!validQ(q)) { const all = LT.LQ.filter(validQ); q = all[rnd(all.length)]; } // 어떤 경우에도 문제는 나온다
-    return q;
+    G.lastQ = q; return q;
   }
   function pickQuestion0(opt, m) {
     if ((m && m.ltssm) || opt.fams || !Array.isArray(opt.chapters) || !opt.chapters.length) return pickLQ(opt, m);
@@ -552,38 +573,40 @@
       const atk = m.ltssm ? Math.round(4 + P.lv * 0.9 + (m.boss ? 3 : 0)) : m.atk;
       B.enemy = Object.assign({ id }, m, { atk }); B.emax = B.ehp = hp; B.eVisible = true; B.eSlide = 60;
       for (let k = 0; k < 15; k++) { B.eSlide -= 4; await sleep(16); } B.eSlide = 0;
-      await G.say(opt.kind === "wild" ? `야생의 ${m.name}이(가) 나타났다!${m.sub ? `\n(${m.sub})` : ""}` : `${opt.trainer}은(는) ${m.name}을(를) 내보냈다!`);
+      const msub = t(m.sub, m.subEn), trn = Array.isArray(opt.trainer) ? t(opt.trainer[0], opt.trainer[1]) : opt.trainer;
+      await G.say(opt.kind === "wild" ? t(`야생의 ${NM(m)}이(가) 나타났다!`, `A wild ${NM(m)} appeared!`) + (msub ? `\n(${msub})` : "") : t(`${trn}은(는) ${NM(m)}을(를) 내보냈다!`, `${trn} sent out ${NM(m)}!`));
       while (B.ehp > 0 && P.hp > 0) {
-        const acts = ["기술", "가방", "도망"];
-        const a = await G.choose(acts, { prompt: `${m.name}  HP ${B.ehp}/${B.emax}${P.st.cs >= 2 ? `   🔥${P.st.cs} 콤보` : ""}\n무엇을 할까?`, grid: true });
+        const acts = [t("기술", "Moves"), t("가방", "Bag"), t("도망", "Run")];
+        const a = await G.choose(acts, { prompt: `${NM(m)}  HP ${B.ehp}/${B.emax}${P.st.cs >= 2 ? `   🔥${P.st.cs} ${t("콤보", "combo")}` : ""}\n${t("무엇을 할까?", "What will you do?")}`, grid: true });
         if (a === 0) {
           let ms = P.moves.map((x) => S.MOVES.find((y) => y.id === x)).filter(Boolean);
           if (!ms.length) { sanitize(); ms = P.moves.map((x) => S.MOVES.find((y) => y.id === x)).filter(Boolean); }
-          const k = await G.choose(ms.map((x) => x.name), { prompt: "어떤 기술을 쓸까?", cancel: true, grid: ms.length > 3, hint: (i) => ms[i] && ms[i].desc });
+          const k = await G.choose(ms.map((x) => x.name), { prompt: t("어떤 기술을 쓸까?", "Which move?"), cancel: true, grid: ms.length > 3, hint: (i) => ms[i] && MD(ms[i]) });
           if (k < 0 || !ms[k]) continue;
           await quizTurn(ms[k], opt, B.enemy);
         } else if (a === 1) {
           const used = await battleBag(); if (!used) continue;
         } else {
-          if (opt.kind === "wild") { await G.say("무사히 도망쳤다! (Link를 잠시 Electrical Idle로...)"); result = "run"; break outer; }
-          await G.say("트레이너와의 승부에서는 도망칠 수 없다!");
+          if (opt.kind === "wild") { await G.say(t("무사히 도망쳤다! (Link를 잠시 Electrical Idle로...)", "Got away safely! (Link went Electrical Idle...)")); result = "run"; break outer; }
+          await G.say(t("트레이너와의 승부에서는 도망칠 수 없다!", "You can't run from a trainer battle!"));
         }
       }
       if (P.hp <= 0) { result = "lose"; break; }
       B.eBlink = 30; await sleep(500); B.eVisible = false;
-      await G.say(`${m.name}을(를) 쓰러뜨렸다!`);
-      let xp = opt.xp ? Math.round(opt.xp / opt.team.length) : m.ltssm ? 5 + (opt.kind !== "wild" ? 4 : 0) + (m.boss ? 12 : 0) : 6 + m.ch * 4 + (m.boss ? 15 : 0);
+      await G.say(t(`${NM(m)}을(를) 쓰러뜨렸다!`, `${NM(m)} was defeated!`));
+      const tw = Math.max(0, Math.min(10, m.town || 1) - 1);
+      let xp = opt.xp ? Math.round(opt.xp / opt.team.length) : m.ltssm ? 5 + 5 * tw + (opt.kind !== "wild" ? 4 + 2 * tw : 0) + (m.boss ? 12 + 6 * tw : 0) : 6 + m.ch * 4 + (m.boss ? 15 : 0);
       const notes = [];
-      if (B.combo) { notes.push(`🔥 콤보 보너스 +${B.combo}`); xp += B.combo; }
-      if (ti === opt.team.length - 1 && B.wrong === 0) { const bonus = Math.max(2, Math.round(xp * 0.3)); xp += bonus; P.st.pf++; notes.push(`✨ 퍼펙트 배틀! +${bonus}`); }
+      if (B.combo) { notes.push(`🔥 ${t("콤보 보너스", "Combo bonus")} +${B.combo}`); xp += B.combo; }
+      if (ti === opt.team.length - 1 && B.wrong === 0) { const bonus = Math.max(2, Math.round(xp * 0.3)); xp += bonus; P.st.pf++; notes.push(`✨ ${t("퍼펙트 배틀!", "Perfect battle!")} +${bonus}`); }
       B.combo = 0;
       await G.gainXP(xp, notes.join("  "));
     }
     document.body.classList.remove("battle");
     if (result === "lose") {
       P.st.cs = 0;
-      await G.say(["Link Down... 눈앞이 캄캄해졌다!", "🔁 Hot Reset! Reset 센터에서 깨어났다."]);
-      P.hp = maxHP(); B = null; G.mode = "field"; await G.warp("center", 4, 4, "up");
+      await G.say([t("Link Down... 눈앞이 캄캄해졌다!", "Link Down... everything went dark!"), t("🔁 Hot Reset! 회복 센터에서 깨어났다.", "🔁 Hot Reset! You woke up at the recovery center.")]);
+      P.hp = maxHP(); B = null; G.mode = "field"; const rs = (G.respawn && G.respawn()) || ["center", 4, 4]; await G.warp(rs[0], rs[1], rs[2], "up");
       return "lose";
     }
     if (result === "win") { P.wins++; if (opt.kind === "boss" && B.dmgTaken === 0) P.flags.gym_nodmg_pending = true; }
@@ -593,23 +616,26 @@
   }
   async function battleBag() {
     const ids = Object.keys(P.items).filter((k) => P.items[k] > 0 && S.ITEMS[k].kind !== "key");
-    if (!ids.length) { await G.say("쓸 수 있는 아이템이 없다."); return false; }
-    const k = await G.choose(ids.map((i) => `${S.ITEMS[i].name} ×${P.items[i]}`), { prompt: "어떤 아이템을 쓸까?", cancel: true, hint: (i) => S.ITEMS[ids[i]].desc });
+    if (!ids.length) { await G.say(t("쓸 수 있는 아이템이 없다.", "No usable items.")); return false; }
+    const k = await G.choose(ids.map((i) => `${IN(S.ITEMS[i])} ×${P.items[i]}`), { prompt: t("어떤 아이템을 쓸까?", "Which item?"), cancel: true, hint: (i) => ID(S.ITEMS[ids[i]]) });
     if (k < 0) return false;
     return useItem(ids[k], true);
   }
   async function useItem(id, inBattle) {
     const it = S.ITEMS[id];
-    if (it.heal) { if (P.hp >= maxHP()) { await G.say("HP가 이미 가득하다."); return false; } const before = P.hp; P.hp = Math.min(maxHP(), P.hp + it.heal); P.items[id]--; await G.say(`${it.name} 사용! HP ${P.hp - before} 회복.`); return true; }
-    if (id === "replay_buf") { if (!inBattle) { await G.say("전투 중에만 쓸 수 있다."); return false; } B.replay = true; P.items[id]--; await G.say("Replay Buffer 장전! 다음 오답은 Nak → 재전송으로 한 번 더 도전할 수 있다."); return true; }
+    if (it.heal) { if (P.hp >= maxHP()) { await G.say(t("HP가 이미 가득하다.", "HP is already full.")); return false; } const before = P.hp; P.hp = Math.min(maxHP(), P.hp + it.heal); P.items[id]--; await G.say(t(`${IN(it)} 사용! HP ${P.hp - before} 회복.`, `Used ${IN(it)}! Recovered ${P.hp - before} HP.`)); return true; }
+    if (id === "replay_buf") { if (!inBattle) { await G.say(t("전투 중에만 쓸 수 있다.", "Only usable in battle.")); return false; } B.replay = true; P.items[id]--; await G.say(t("Replay Buffer 장전! 다음 오답은 Nak → 재전송으로 한 번 더 도전할 수 있다.", "Replay Buffer loaded! Your next wrong answer gets a Nak → replay retry.")); return true; }
     if (id === "msix_table") { await G.say(["📨 MSI-X vector로 Root 박사님께 Memory Write 인터럽트 전송!", G.hint ? G.hint() : "..."], "Root 박사"); return false; }
-    await G.say(it.desc); return false;
+    await G.say(ID(it)); return false;
   }
   G.useItem = useItem;
   const qStatHTML = (s) => !s ? `<span class="tag new">NEW</span>` : `<span class="tag ok">✓${s.ok}</span><span class="tag ng">✗${s.n - s.ok}</span>${(s.st || 0) >= 3 ? `<span class="tag ms">👑 마스터</span>` : (s.st || 0) > 0 ? `<span class="tag st">연속 ${s.st}</span>` : ""}`;
+  /* 문제 현지화: q.en이 있으면 영어, 없으면(1번 마을) 한국어 원문 */
+  const loc = (q) => (G.lang === "en" && q.en ? { q: q.en.q, c: q.en.c, e: q.en.e } : { q: q.q, c: q.c, e: q.e });
+  G.locQ = loc;
   async function quizTurn(move, opt, m) {
     move = move || S.MOVES.find((x) => x.id === BASE_MOVE);
-    const q = pickQuestion(opt, m);
+    const q0 = pickQuestion(opt, m), L0 = loc(q0), q = Object.assign({}, q0, { q: L0.q, c: L0.c, e: L0.e });
     const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
     const labels = order.map((i) => q.c[i]); const correct = order.indexOf(q.a);
     const dis = new Set(); const wrong = [0, 1, 2, 3].filter((i) => i !== correct).sort(() => Math.random() - 0.5);
@@ -617,17 +643,17 @@
     let replay = move.effect === "replay" || B.replay; B.replay = false;
     const stars = "★".repeat(q.d) + "☆".repeat(3 - q.d);
     const fs = q.rule && stateOf(q.fam), cc = q.concept && S.CONCEPTS[q.concept];
-    const topic = fs ? `${fs.name}${fs.tag ? " · " + fs.tag : ""}` : cc ? cc.name : "spec";
+    const topic = fs ? SN(fs) : cc ? cc.name : "spec";
     const header = `[${move.name}] ${topic} · ${stars}`;
     const s0 = P.seenQ[q.id];
-    const ruleTag = q.rule ? ` <span class="tag rl">규칙 ${Math.min(ruleN(q.rule), LT.RULE_NEED)}/${LT.RULE_NEED}${ruleOK(q.rule) ? " ✔" : ""}</span>` : "";
+    const ruleTag = (q.rule ? ` <span class="tag rl">${t("규칙", "Rule")} ${Math.min(ruleN(q.rule), LT.RULE_NEED)}/${LT.RULE_NEED}${ruleOK(q.rule) ? " ✔" : ""}</span>` : "") + " " + tagHTML(q.tag || (fs && fs.tag) || "PCIe");
     const grid = labels.every((l) => l.length <= 13);
     let pick;
     while (true) {
       pick = await G.choose(labels, { header, prompt: q.q, sub: qStatHTML(s0) + ruleTag, disabled: dis, quiz: true, grid });
       if (pick === correct || !replay) break;
       dis.add(pick); replay = false; G.markChoices(-1, pick); await sleep(250);
-      await G.say("❌ 오답... 하지만 재전송! 한 번 더!");
+      await G.say(t("❌ 오답... 하지만 재전송! 한 번 더!", "❌ Wrong... but replay! Try again!"));
     }
     const ok = pick === correct; G.markChoices(correct, pick);
     const s = (P.seenQ[q.id] = P.seenQ[q.id] || { n: 0, ok: 0, st: 0 }); s.n++; if (ok) { s.ok++; s.st = (s.st || 0) + 1; } else s.st = 0;
@@ -636,8 +662,8 @@
     window.LUI && LUI.sfx(ok ? (P.st.cs >= 3 ? "combo" : "ok") : "ng");
     await sleep(350);
     const newMaster = ok && s.st === 3;
-    const statLine = `✓${s.ok} ✗${s.n - s.ok}${newMaster ? "  👑 이 문제 마스터!" : s.st >= 3 ? "  👑" : ""}${ok && P.st.cs >= 3 ? `  🔥 ${P.st.cs} 콤보!` : ""}`;
-    await G.say([`${ok ? "⭕ 정답!" : "❌ 오답!"}  정답: ${q.c[q.a]}\n${statLine}`, `📘 ${q.e}`]);
+    const statLine = `✓${s.ok} ✗${s.n - s.ok}${newMaster ? t("  👑 이 문제 마스터!", "  👑 Question mastered!") : s.st >= 3 ? "  👑" : ""}${ok && P.st.cs >= 3 ? `  🔥 ${P.st.cs} ${t("콤보!", "combo!")}` : ""}`;
+    await G.say([`${ok ? t("⭕ 정답!", "⭕ Correct!") : t("❌ 오답!", "❌ Wrong!")}  ${t("정답", "Answer")}: ${q.c[q.a]}\n${statLine}`, `📘 ${q.e}`]);
     if (q.concept && !P.learned[q.concept]) await G.learn(q.concept);
     if (ok && q.rule) await ruleProgress(q.rule);
     if (ok) {
@@ -648,138 +674,156 @@
       const mult = (1 + 0.12 * (P.gen - 1) + 0.06 * Math.log2(P.width)) * (P.st.cs >= 5 ? 1.15 : 1);
       const dmg = Math.max(1, Math.round((pow + P.lv * 1.5) * mult * (0.9 + Math.random() * 0.2)));
       B.eShake = 20; B.ehp = Math.max(0, B.ehp - dmg);
-      let msg = `Link의 「${move.name}」! ${m.name}에게 ${dmg} 데미지!${P.st.cs >= 5 ? " (콤보 강화)" : ""}`;
-      if (move.effect === "heal") { const h = Math.round(maxHP() * (move.heal || 0.35)); const b = P.hp; P.hp = Math.min(maxHP(), P.hp + h); msg += `\nHP ${P.hp - b} 회복!`; }
+      let msg = t(`Link의 「${move.name}」! ${NM(m)}에게 ${dmg} 데미지!${P.st.cs >= 5 ? " (콤보 강화)" : ""}`, `Link used ${move.name}! ${dmg} damage to ${NM(m)}!${P.st.cs >= 5 ? " (combo boost)" : ""}`);
+      if (move.effect === "heal") { const h = Math.round(maxHP() * (move.heal || 0.35)); const b = P.hp; P.hp = Math.min(maxHP(), P.hp + h); msg += t(`\nHP ${P.hp - b} 회복!`, `\nRecovered ${P.hp - b} HP!`); }
       await G.say(msg);
     } else {
       let dmg = m.atk + rnd(3);
       if (move.effect === "risky") dmg = Math.round(dmg * 1.5);
       if (move.effect === "fec") dmg = Math.round(dmg * 0.5);
       B.pShake = 20; P.hp = Math.max(0, P.hp - dmg); B.dmgTaken += dmg;
-      let msg = `${m.name}의 반격! Link는 ${dmg} 데미지를 받았다.${move.effect === "fec" ? " (피해 절반)" : ""}`;
-      if (move.effect === "echo") { const r = Math.max(1, Math.round(dmg / 2)); B.ehp = Math.max(0, B.ehp - r); B.eShake = 20; msg += `\nLoopback 에코! ${r} 데미지를 되돌려 보냈다.`; }
+      let msg = t(`${NM(m)}의 반격! Link는 ${dmg} 데미지를 받았다.${move.effect === "fec" ? " (피해 절반)" : ""}`, `${NM(m)} strikes back! Link took ${dmg} damage.${move.effect === "fec" ? " (halved)" : ""}`);
+      if (move.effect === "echo") { const r = Math.max(1, Math.round(dmg / 2)); B.ehp = Math.max(0, B.ehp - r); B.eShake = 20; msg += t(`\nLoopback 에코! ${r} 데미지를 되돌려 보냈다.`, `\nLoopback echo! Reflected ${r} damage.`); }
       await G.say(msg);
     }
     await G.checkAch();
   }
 
   /* ---------------- 필드 메뉴 ---------------- */
+  /* 마을 진행: 마을 n은 이전 관장 배지가 있으면 열림 */
+  const TOWNS = () => [{ n: 1, ko: "LTSSM 마을", en: "LTSSM Town", gymLv: 10, badge: Object.assign({ isMaster: true }, LT.MASTER) }].concat(LT.TOWNS || []);
+  const gymBadgeOf = (n) => (n === 1 ? "l0" : "g" + n);
+  const townOpen = (n) => n === 1 || P.badges.includes(gymBadgeOf(n - 1));
+  const townCleared = (n) => P.badges.includes(gymBadgeOf(n));
+  const statesOf = (n) => LT.STATES.filter((st) => (st.town || 1) === n);
+  const townProgress = (n) => { let d = 0, tt = 0; statesOf(n).forEach((st) => { d += stateDone(st.id); tt += stateTot(st.id); }); return tt ? d / tt : 0; };
+  const townName = (T) => t(T.ko, T.en);
+  G.townOpen = townOpen; G.townCleared = townCleared; G.townProgress = townProgress; G.statesOf = statesOf; G.TOWNS = TOWNS; G.gymBadgeOf = gymBadgeOf;
+  G.curTown = () => { const m = curMap(); return (m && m.town) || 1; };
+  /* 여러 마을이 열려 있으면 마을을 먼저 고른다 (-1 = 취소) */
+  async function pickTown(title) {
+    const open = TOWNS().filter((T) => townOpen(T.n));
+    if (open.length <= 1) return 1;
+    const cur = G.curTown(), labels = open.map((T) => `${T.n}. ${townName(T)}  ${Math.round(townProgress(T.n) * 100)}%${townCleared(T.n) ? " 🏅" : ""}${T.n === cur ? " 📍" : ""}`);
+    const k = await G.choose(labels, { prompt: title, cancel: true });
+    return k < 0 ? -1 : open[k].n;
+  }
   async function fieldMenu() {
     while (true) {
       const ext = G.menuExtras || [];
-      const base = ["Link 상태", "규칙 도감", "배지 케이스", "몬스터 도감", "업적·칭호", "기록", "기술", "가방", "spec 도감", "저장"];
-      const k = await G.choose(base.concat(ext.map((e) => e.label), ["닫기"]), { prompt: "메뉴", cancel: true, grid: true });
+      const base = [t("Link 상태", "Status"), t("월드맵", "World map"), t("규칙 도감", "Rule dex"), t("배지 케이스", "Badges"), t("몬스터 도감", "Monster dex"), t("업적·칭호", "Achievements"), t("기록", "Stats"), t("기술", "Moves"), t("가방", "Bag"), t("저장", "Save"), "Language: " + (G.lang === "en" ? "English" : "한국어")];
+      const k = await G.choose(base.concat(ext.map((e) => e.label), [t("닫기", "Close")]), { prompt: t("메뉴", "Menu"), cancel: true, grid: true });
       const nb = base.length;
       if (k >= nb && k < nb + ext.length) { const r = await ext[k - nb].run(); if (r === "close") return; continue; }
       if (k === 0) await statusPanel();
-      else if (k === 1) await ruleDex();
-      else if (k === 2) await badgeCase();
-      else if (k === 3) await monDex();
-      else if (k === 4) await achPanel();
-      else if (k === 5) await statsPanel();
-      else if (k === 6) await movesPanel();
-      else if (k === 7) await bagPanel();
-      else if (k === 8) await dexPanel();
-      else if (k === 9) { G.save(); await G.say("💾 진행 상황을 저장했다. (localStorage)"); }
+      else if (k === 1) { if (G.worldMap) { const r = await G.worldMap(); if (r === "close") return; } }
+      else if (k === 2) await ruleDex();
+      else if (k === 3) await badgeCase();
+      else if (k === 4) await monDex();
+      else if (k === 5) await achPanel();
+      else if (k === 6) await statsPanel();
+      else if (k === 7) await movesPanel();
+      else if (k === 8) await bagPanel();
+      else if (k === 9) { G.save(); await G.say(t("💾 진행 상황을 저장했다. (localStorage)", "💾 Progress saved (localStorage).")); }
+      else if (k === 10) { G.setLang(G.lang === "en" ? "ko" : "en"); }
       else return;
     }
   }
   G.fieldMenu = fieldMenu;
   async function statusPanel() {
-    const ch = S.CHAPTERS.find((c) => c.id === P.chapter) || S.CHAPTERS[0];
+    const cur = TOWNS().find((T) => T.n === G.curTown()) || TOWNS()[0];
+    const gyms = P.badges.map((b) => { const T = TOWNS().find((x) => gymBadgeOf(x.n) === b); return T ? townName(T) : b === "champ" ? t("챔피언", "Champion") : b === "dl" ? "DL_Active(legacy)" : b; });
     const items = [
-      { label: `Lv ${P.lv}   EXP ${P.xp}/${xpNeed(P.lv)}`, bar: P.xp / xpNeed(P.lv), desc: "정답으로 몬스터를 쓰러뜨리면 경험치를 얻는다. 콤보·퍼펙트 배틀이면 보너스!" },
-      { label: `HP ${P.hp}/${maxHP()}`, bar: P.hp / maxHP(), desc: "오답을 고르면 몬스터의 반격으로 HP가 줄어든다. 0이 되면 Link Down → Hot Reset." },
-      { label: `칭호: ${P.title || "(없음)"}`, desc: "업적을 달성하면 칭호를 얻는다. 업적·칭호 메뉴에서 바꿀 수 있다." },
-      { label: `LTSSM: ${P.ltssm}`, desc: "Detect 배지 → Polling, Polling 배지 → Configuration, Configuration 배지 → L0(2.5 GT/s)." },
-      { label: `속도: Gen${P.gen} (${RATE[P.gen]})`, desc: "L0 이후 Recovery 배지(속도 변경), Equalization 배지(8 GT/s 이상), L0p 배지(Flit, 64/128 GT/s)와 레벨이 필요하다." },
-      { label: `Link 폭: x${P.width}`, desc: "L0에 도달한 뒤 레벨에 따라 x1→x2→x4→x8→x16." },
-      { label: `state 배지: ${P.sbadges.length}/${LT.STATES.length}`, bar: P.sbadges.length / LT.STATES.length, desc: "각 state의 규칙을 모두 익히면 그 state 배지." },
-      { label: `관장 배지: ${P.badges.length ? P.badges.map((b) => ({ l0: "LTSSM 마스터", dl: "DL_Active" }[b] || b)).join(", ") : "없음"}`, desc: "관장을 이기면 받는다." },
-      { label: `현재 장: ${ch.title}`, desc: `무대: ${ch.area}` }
+      { label: `Lv ${P.lv}   EXP ${P.xp}/${xpNeed(P.lv)}`, bar: P.xp / xpNeed(P.lv), desc: t("정답으로 몬스터를 쓰러뜨리면 경험치를 얻는다. 콤보·퍼펙트 배틀이면 보너스!", "Defeat monsters with correct answers for EXP. Combos and perfect battles give bonuses!") },
+      { label: `HP ${P.hp}/${maxHP()}`, bar: P.hp / maxHP(), desc: t("오답을 고르면 몬스터의 반격으로 HP가 줄어든다. 0이 되면 Link Down → Hot Reset.", "Wrong answers let the monster strike back. At 0 HP: Link Down → Hot Reset.") },
+      { label: `${t("칭호", "Title")}: ${P.title || "-"}`, desc: t("업적을 달성하면 칭호를 얻는다.", "Achievements unlock titles.") },
+      { label: `${t("현재 마을", "Town")}: ${cur.n}. ${townName(cur)}`, bar: townProgress(cur.n), desc: t(`이 마을 규칙 진행 ${Math.round(townProgress(cur.n) * 100)}%`, `Rule progress here ${Math.round(townProgress(cur.n) * 100)}%`) },
+      { label: `LTSSM: ${P.ltssm}`, desc: t("Detect 배지 → Polling, Polling 배지 → Configuration, Configuration 배지 → L0(2.5 GT/s).", "Detect badge → Polling, Polling badge → Configuration, Configuration badge → L0 (2.5 GT/s).") },
+      { label: `${t("속도", "Speed")}: Gen${P.gen} (${RATE[P.gen]})`, desc: t("L0 이후 Recovery 배지(속도 변경), Equalization 배지(8 GT/s 이상), L0p 배지(Flit, 64/128 GT/s)와 레벨이 필요하다.", "After L0: the Recovery badge (speed change), Equalization badge (8 GT/s+), L0p badge (Flit, 64/128 GT/s) and levels.") },
+      { label: `${t("Link 폭", "Link width")}: x${P.width}`, desc: t("L0에 도달한 뒤 레벨에 따라 x1→x2→x4→x8→x16.", "After L0, width grows with level: x1→x2→x4→x8→x16.") },
+      { label: `${t("규칙 배지", "Rule badges")}: ${P.sbadges.length}/${LT.STATES.length}`, bar: P.sbadges.length / LT.STATES.length, desc: t("각 규칙 묶음의 규칙을 모두 익히면 배지.", "Learn every rule in a group to earn its badge.") },
+      { label: `${t("관장 배지", "Gym badges")}: ${gyms.length ? gyms.join(", ") : "-"}`, desc: t("관장을 이기면 받는다.", "Beat a gym leader to earn one.") }
     ];
-    await G.panel("Link 상태", items);
+    await G.panel(t("Link 상태", "Status"), items);
   }
   async function ruleDex() {
+    const tn = await pickTown(t("어느 마을의 규칙 도감?", "Rule dex of which town?")); if (tn < 0) return;
     const items = [];
-    LT.STATES.forEach((st) => {
-      const d = stateDone(st.id), t = stateTot(st.id);
-      items.push({ sec: true, label: `${st.name}${st.tag ? " (" + st.tag + ")" : ""}  ${d}/${t}${hasSB(st.id) ? " 🏅" : ""}`, icon: LUI.badgeURL(st, !hasSB(st.id), 2), bar: d / t, cls: "secbar" });
-      Object.entries(st.rules).forEach(([rid, text]) => {
-        const n = Math.min(ruleN(rid), LT.RULE_NEED), seen = Object.keys(P.seenQ).some((k) => k.startsWith("L" + rid + "_"));
+    statesOf(tn).forEach((st) => {
+      const d = stateDone(st.id), tt = stateTot(st.id);
+      items.push({ sec: true, label: `${SN(st)}${st.tag ? " [" + (st.tag === "공통" ? t("공통", "Common") : st.tag) + "]" : ""}  ${d}/${tt}${hasSB(st.id) ? " 🏅" : ""}`, icon: LUI.badgeURL(st, !hasSB(st.id), 2), bar: d / tt, cls: "secbar" });
+      Object.keys(st.rules).forEach((rid) => {
+        const text = RT(rid);
+        const n = Math.min(ruleN(rid), LT.RULE_NEED), qs = LT.LQ.filter((q) => q.rule === rid), seen = qs.some((q) => P.seenQ[q.id]);
         const dots = "●".repeat(n) + "○".repeat(LT.RULE_NEED - n);
-        const qs = LT.LQ.filter((q) => q.rule === rid), qok = qs.filter((q) => P.seenQ[q.id] && P.seenQ[q.id].ok).length;
-        items.push({ label: `${dots} ${ruleOK(rid) || seen ? text : "??? (아직 못 만난 규칙)"}`, lock: !ruleOK(rid),
-          desc: `【${st.name}】 ${ruleOK(rid) ? "✔ 습득" : `${n}/${LT.RULE_NEED} 정답`}\n${ruleOK(rid) || seen ? text : "이 규칙의 문제를 만나면 내용이 보인다."}\n관련 문제 ${qs.length}개 중 ${qok}개 맞힘`.trim() });
+        const qok = qs.filter((q) => P.seenQ[q.id] && P.seenQ[q.id].ok).length;
+        const tags = [...new Set(qs.map((q) => q.tag).filter(Boolean))].map((x) => (x === "공통" ? t("공통", "Common") : x)).join("/");
+        items.push({ label: `${dots} ${ruleOK(rid) || seen ? text : t("??? (아직 못 만난 규칙)", "??? (not met yet)")}`, lock: !ruleOK(rid),
+          desc: `【${SN(st)}】 ${ruleOK(rid) ? t("✔ 습득", "✔ learned") : `${n}/${LT.RULE_NEED} ${t("정답", "correct")}`}${tags ? "  [" + tags + "]" : ""}\n${ruleOK(rid) || seen ? text : t("이 규칙의 문제를 만나면 내용이 보인다.", "Meet a question on this rule to reveal it.")}\n${t(`관련 문제 ${qs.length}개 중 ${qok}개 맞힘`, `${qok} of ${qs.length} related questions answered correctly`)}`.trim() });
       });
     });
-    const tot = Object.keys(LT.RULES).length, done = Object.keys(LT.RULES).filter(ruleOK).length;
-    await G.panel(`규칙 도감 ${done}/${tot}`, items);
+    const rs = statesOf(tn).reduce((a, st) => a.concat(Object.keys(st.rules)), []), done = rs.filter(ruleOK).length;
+    await G.panel(`${t("규칙 도감", "Rule dex")} ${tn}${t("번 마을", "")} ${done}/${rs.length}`, items);
   }
   async function badgeCase() {
-    const list = LT.STATES.map((st) => ({ st, got: hasSB(st.id) })).concat([{ st: Object.assign({ isMaster: true }, LT.MASTER), got: P.badges.includes("l0") }]);
-    const items = list.map(({ st, got }) => ({ icon: LUI.badgeURL(st, !got, 3), label: got ? st.name : "???", lock: !got, cls: "bslot" + (got ? " got" : ""),
-      desc: st.isMaster ? (got ? "🏆 LTSSM 마스터 배지 — LTSSM 관장을 이긴 증표." : "LTSSM 관장을 이기면 받는다. (Lv10 + 핵심 배지 5개)") :
-        got ? `🏅 ${st.name} 배지\n${st.intro}` : `${st.name}: 규칙 ${stateDone(st.id)}/${stateTot(st.id)}${st.core ? "  · 관장 도전 필수" : ""}\n${st.intro}` }));
+    const tn = await pickTown(t("어느 마을의 배지 케이스?", "Badges of which town?")); if (tn < 0) return;
+    const T = TOWNS().find((x) => x.n === tn);
+    const list = statesOf(tn).map((st) => ({ st, got: hasSB(st.id) })).concat([{ st: T.badge, got: P.badges.includes(gymBadgeOf(tn)), gym: true }]);
+    if (tn === 10 && LT.CHAMP_BADGE) list.push({ st: LT.CHAMP_BADGE, got: P.badges.includes("champ"), gym: true });
+    const items = list.map(({ st, got, gym }) => ({ icon: LUI.badgeURL(st, !got, 3), label: got ? SN(st) : "???", lock: !got, cls: "bslot" + (got ? " got" : ""),
+      desc: gym ? (got ? t(`🏆 ${SN(st)} — 관장을 이긴 증표.`, `🏆 ${SN(st)} — proof of beating the leader.`) : t(`관장을 이기면 받는다. (Lv${T.gymLv} + 이 마을 필수 배지)`, `Beat the leader (Lv${T.gymLv} + this town's required badges).`)) :
+        got ? `🏅 ${SN(st)}\n${t(st.intro, st.introEn)}` : `${SN(st)}: ${t("규칙", "rules")} ${stateDone(st.id)}/${stateTot(st.id)}${st.core ? t("  · 관장 도전 필수", "  · required for the gym") : ""}\n${t(st.intro, st.introEn)}` }));
     const n = list.filter((x) => x.got).length;
-    await G.panel(`배지 케이스 ${n}/${list.length}`, items, { cols: 4 });
+    await G.panel(`${t("배지 케이스", "Badges")} · ${townName(T)} ${n}/${list.length}`, items, { cols: 4 });
   }
   async function monDex() {
+    const tn = await pickTown(t("어느 마을의 몬스터 도감?", "Monster dex of which town?")); if (tn < 0) return;
     const items = [];
-    LT.STATES.forEach((st) => {
+    statesOf(tn).forEach((st) => {
       const ms = LT.LMON.filter((m) => m.fam === st.id && !m.boss); if (!ms.length) return;
-      items.push({ sec: true, label: st.name });
-      ms.forEach((m) => { const met = P.met.includes(m.id); items.push({ icon: LUI.monIcon(m, !met), label: met ? m.name : "???", lock: !met, cls: "mon",
-        desc: met ? `【${m.name}】 ${m.sub}\n집중 규칙: ${(m.rules || []).map((r) => LT.RULES[r].text.split(/[:,]/)[0]).join(" / ")}` : "아직 만나지 못한 몬스터. 서식지를 돌아다녀 보자." }); });
+      items.push({ sec: true, label: SN(st) + (st.tag ? ` [${st.tag === "공통" ? t("공통", "Common") : st.tag}]` : "") });
+      ms.forEach((m) => { const met = P.met.includes(m.id); items.push({ icon: LUI.monIcon(m, !met), label: met ? NM(m) : "???", lock: !met, cls: "mon",
+        desc: met ? `【${NM(m)}】 ${t(m.sub, m.subEn)}\n${t("집중 규칙", "Focus rules")}: ${(m.rules || []).map((r) => RT(r).split(/[:,]/)[0]).join(" / ")}` : t("아직 만나지 못한 몬스터. 서식지를 돌아다녀 보자.", "Not met yet. Explore its habitat.") }); });
     });
-    const tot = LT.LMON.filter((m) => !m.boss).length, met = LT.LMON.filter((m) => !m.boss && P.met.includes(m.id)).length;
-    await G.panel(`몬스터 도감 ${met}/${tot}`, items);
+    const all = LT.LMON.filter((m) => !m.boss && (m.town || 1) === tn), met = all.filter((m) => P.met.includes(m.id)).length;
+    await G.panel(`${t("몬스터 도감", "Monster dex")} ${met}/${all.length}`, items);
   }
   async function achPanel() {
     while (true) {
-      const items = LT.ACH.map((a) => { const got = P.ach.includes(a.id); return { label: `${got ? "🏆" : "🔒"} ${a.name}${got && P.title === a.title ? "  (장착 중)" : ""}`, lock: !got, desc: `${a.desc}\n칭호: 「${got ? a.title : "???"}」${got ? "\n(A: 칭호 장착)" : ""}` }; });
-      const k = await G.panel(`업적 ${P.ach.length}/${LT.ACH.length} · 칭호 「${P.title || "-"}」`, items, { selectable: true });
+      const items = LT.ACH.map((a) => { const got = P.ach.includes(a.id); return { label: `${got ? "🏆" : "🔒"} ${a.name}${got && P.title === a.title ? t("  (장착 중)", "  (equipped)") : ""}`, lock: !got, desc: `${a.desc}\n${t("칭호", "Title")}: 「${got ? a.title : "???"}」${got ? t("\n(A: 칭호 장착)", "\n(A: equip title)") : ""}` }; });
+      const k = await G.panel(`${t("업적", "Achievements")} ${P.ach.length}/${LT.ACH.length} · ${t("칭호", "Title")} 「${P.title || "-"}」`, items, { selectable: true });
       if (k < 0) return;
-      const a = LT.ACH[k]; if (P.ach.includes(a.id)) { P.title = a.title; window.LUI && LUI.toast(`칭호 「${a.title}」 장착!`); }
+      const a = LT.ACH[k]; if (P.ach.includes(a.id)) { P.title = a.title; window.LUI && LUI.toast(t(`칭호 「${a.title}」 장착!`, `Title 「${a.title}」 equipped!`)); }
     }
   }
   async function statsPanel() {
-    const t = totals(), acc = t.n ? Math.round((t.ok / t.n) * 100) : 0, min = Math.round((P.playMs || 0) / 60000);
+    const tt = totals(), acc = tt.n ? Math.round((tt.ok / tt.n) * 100) : 0, min = Math.round((P.playMs || 0) / 60000);
     const rulesDone = Object.keys(LT.RULES).filter(ruleOK).length, rulesTot = Object.keys(LT.RULES).length;
     const items = [
-      { label: `총 답변 ${t.n}  ·  정답 ${t.ok}  ·  오답 ${t.n - t.ok}`, desc: "퀴즈 배틀에서 고른 답의 누적 기록." },
-      { label: `정확도 ${acc}%`, bar: acc / 100, desc: "정답 ÷ 전체 답변." },
-      { label: `최고 연속 정답 ${P.st.bs}  (현재 ${P.st.cs})`, desc: "3연속부터 콤보 보너스 XP, 5연속부터 공격력 +15%." },
-      { label: `퍼펙트 배틀 ${P.st.pf}회  ·  승리 ${P.wins}회`, desc: "오답 없이 이긴 배틀은 XP +30%." },
-      { label: `마스터한 문제 ${t.mq} / 푼 문제 ${Object.keys(P.seenQ).length}`, desc: "같은 문제를 3번 연속 맞히면 👑 마스터." },
-      { label: `규칙 ${rulesDone}/${rulesTot}`, bar: rulesDone / rulesTot, desc: "규칙마다 정답 2번이면 습득." },
-      { label: `플레이 시간 ${Math.floor(min / 60)}시간 ${min % 60}분`, desc: "필드·전투 시간 합계." }
+      { label: t(`총 답변 ${tt.n}  ·  정답 ${tt.ok}  ·  오답 ${tt.n - tt.ok}`, `Answers ${tt.n}  ·  correct ${tt.ok}  ·  wrong ${tt.n - tt.ok}`), desc: t("퀴즈 배틀에서 고른 답의 누적 기록.", "All answers chosen in quiz battles.") },
+      { label: `${t("정확도", "Accuracy")} ${acc}%`, bar: acc / 100, desc: t("정답 ÷ 전체 답변.", "Correct ÷ all answers.") },
+      { label: t(`최고 연속 정답 ${P.st.bs}  (현재 ${P.st.cs})`, `Best streak ${P.st.bs}  (now ${P.st.cs})`), desc: t("3연속부터 콤보 보너스 XP, 5연속부터 공격력 +15%.", "3 in a row: combo EXP; 5 in a row: +15% attack.") },
+      { label: t(`퍼펙트 배틀 ${P.st.pf}회  ·  승리 ${P.wins}회`, `Perfect battles ${P.st.pf}  ·  wins ${P.wins}`), desc: t("오답 없이 이긴 배틀은 XP +30%.", "Battles won without a wrong answer give +30% EXP.") },
+      { label: t(`마스터한 문제 ${tt.mq} / 푼 문제 ${Object.keys(P.seenQ).length}`, `Mastered ${tt.mq} / seen ${Object.keys(P.seenQ).length}`), desc: t("같은 문제를 3번 연속 맞히면 👑 마스터.", "Answer a question right 3 times in a row to 👑 master it.") },
+      { label: `${t("규칙", "Rules")} ${rulesDone}/${rulesTot}`, bar: rulesDone / rulesTot, desc: t("규칙마다 정답 2번이면 습득.", "Two correct answers per rule to learn it.") },
+      { label: t(`플레이 시간 ${Math.floor(min / 60)}시간 ${min % 60}분`, `Play time ${Math.floor(min / 60)}h ${min % 60}m`), desc: t("필드·전투 시간 합계.", "Field + battle time.") }
     ];
-    LT.STATES.forEach((st) => items.push({ label: `${st.name} ${Math.round((stateDone(st.id) / stateTot(st.id)) * 100)}%`, bar: stateDone(st.id) / stateTot(st.id), icon: LUI.badgeURL(st, !hasSB(st.id), 2), cls: "mini", desc: `${st.name} 규칙 ${stateDone(st.id)}/${stateTot(st.id)}` }));
-    await G.panel("기록", items);
-  }
-  async function dexPanel() {
-    const items = [];
-    S.CHAPTERS.filter((c) => c.id >= 2).forEach((c) => {
-      items.push({ sec: true, label: c.title + (c.status === "stub" ? " (준비 중)" : "") });
-      Object.entries(S.CONCEPTS).filter(([, v]) => v.ch === c.id).forEach(([id, v]) => {
-        const l = P.learned[id], ms = P.mastery[id];
-        const star = ms ? " " + (ms.ok >= 3 ? "★★★" : ms.ok >= 2 ? "★★☆" : ms.ok >= 1 ? "★☆☆" : "☆☆☆") : "";
-        items.push({ label: l ? `${v.name}${star}` : "??? (미발견)", lock: !l, desc: l ? `【${v.name}】${ms ? `  정답 ${ms.ok}/${ms.n}` : ""}\n${v.note}` : "아직 배우지 않은 개념. NPC와 대화하거나 퀴즈 배틀에서 만나면 등록된다." });
-      });
+    TOWNS().filter((T) => townOpen(T.n)).forEach((T) => {
+      items.push({ sec: true, label: `${T.n}. ${townName(T)}  ${Math.round(townProgress(T.n) * 100)}%`, bar: townProgress(T.n), cls: "secbar" });
+      statesOf(T.n).forEach((st) => items.push({ label: `${SN(st)} ${Math.round((stateDone(st.id) / stateTot(st.id)) * 100)}%`, bar: stateDone(st.id) / stateTot(st.id), icon: LUI.badgeURL(st, !hasSB(st.id), 2), cls: "mini", desc: `${SN(st)} ${t("규칙", "rules")} ${stateDone(st.id)}/${stateTot(st.id)}` }));
     });
-    await G.panel(`spec 도감 (2장~)`, items);
+    await G.panel(t("기록", "Stats"), items);
   }
   async function movesPanel() {
     const items = S.MOVES.map((m) => { const has = P.moves.includes(m.id); return { label: has ? m.name : `??? (Lv${m.lv} + ${moveReqText(m)})`, lock: !has,
-      desc: has ? `【${m.name}】\n${m.desc}` : `Lv${m.lv} 이상 + ${moveReqText(m)}이면 습득. ${moveReqMet(m) ? "(조건 충족 ✓)" : m.req ? `(현재 ${stateDone(m.req.s)}/${m.req.n})` : "(미학습)"}` }; });
-    await G.panel("기술 (spec 메커니즘)", items);
+      desc: has ? `【${m.name}】\n${MD(m)}` : t(`Lv${m.lv} 이상 + ${moveReqText(m)}이면 습득. `, `Learned at Lv${m.lv} + ${moveReqText(m)}. `) + (moveReqMet(m) ? t("(조건 충족 ✓)", "(requirement met ✓)") : m.req ? `(${stateDone(m.req.s)}/${m.req.n})` : "") }; });
+    await G.panel(t("기술 (spec 메커니즘)", "Moves (spec mechanisms)"), items);
   }
   async function bagPanel() {
     while (true) {
-      const ids = Object.keys(P.items).filter((k) => P.items[k] > 0);
-      if (!ids.length) { await G.say("가방이 비어 있다."); return; }
-      const k = await G.panel("가방", ids.map((i) => ({ label: `${S.ITEMS[i].name}  ×${P.items[i]}${S.ITEMS[i].kind === "key" ? " (중요)" : ""}`, desc: S.ITEMS[i].desc + "\n(A: 사용)" })), { selectable: true });
+      const ids = Object.keys(P.items).filter((k) => P.items[k] > 0 && S.ITEMS[k]);
+      if (!ids.length) { await G.say(t("가방이 비어 있다.", "Your bag is empty.")); return; }
+      const k = await G.panel(t("가방", "Bag"), ids.map((i) => ({ label: `${IN(S.ITEMS[i])}  ×${P.items[i]}${S.ITEMS[i].kind === "key" ? t(" (중요)", " (key)") : ""}`, desc: ID(S.ITEMS[i]) + t("\n(A: 사용)", "\n(A: use)") })), { selectable: true });
       if (k < 0) return;
       await useItem(ids[k], false);
     }
@@ -791,12 +835,14 @@
     G.mode = "title";
     while (true) {
       const ext = (G.titleExtras || []).filter((e) => !e.cond || e.cond());
-      const base = G.hasSave() ? ["이어하기", "새로 시작"] : ["새로 시작"];
-      const opts = ext.filter((e) => e.top).map((e) => e.label).concat(base, ext.filter((e) => !e.top).map((e) => e.label));
-      const k = await G.choose(opts, { prompt: "SPEC 몬스터 골드 — PCIe/CXL 편\nA: 선택  (키보드: Z=A, X=B, 방향키)" });
+      const CONT = t("이어하기", "Continue"), NEW = t("새로 시작", "New game"), LNG = "🌐 " + (G.lang === "en" ? "한국어로" : "English");
+      const base = G.hasSave() ? [CONT, NEW] : [NEW];
+      const opts = ext.filter((e) => e.top).map((e) => e.label).concat(base, ext.filter((e) => !e.top).map((e) => e.label), [LNG]);
+      const k = await G.choose(opts, { prompt: t("SPEC 몬스터 골드 — PCIe/CXL 편\nA: 선택  (키보드: Z=A, X=B, 방향키)", "SPEC Monster Gold — PCIe/CXL\nA: select  (keys: Z=A, X=B, arrows)") });
+      if (opts[k] === LNG) { G.setLang(G.lang === "en" ? "ko" : "en"); continue; }
       const e = ext.find((x) => x.label === opts[k]);
       if (e) { if (await e.run()) { G.mode = "field"; showFieldHint(); return; } continue; }
-      if (opts[k] === "이어하기") { G.load(); G.mode = "field"; showFieldHint(); if (G.justMigrated && G.onMigrated) runScript(G.onMigrated); }
+      if (opts[k] === CONT) { G.load(); G.mode = "field"; showFieldHint(); if (G.justMigrated && G.onMigrated) runScript(G.onMigrated); }
       else { G.newGame(); G.mode = "field"; G.save(); if (G.onNewGame) runScript(G.onNewGame); }
       return;
     }

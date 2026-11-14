@@ -89,7 +89,7 @@
   }
 
   /* ---- 검증 (치트/손상 방지 기본 점검) ---- */
-  const BADGES = ["l0", "dl"], LTSSM = ["Detect", "Polling", "Configuration", "L0"];
+  const BADGES = ["l0", "dl", "g2", "g3", "g4", "g5", "g6", "g7", "g8", "g9", "g10", "champ"], LTSSM = ["Detect", "Polling", "Configuration", "L0"];
   /* 구버전(v1 진행 구조) 저장 → 현재 구조로 이주 (SPEC.LTSSM.migrate) */
   function migrate(P, SPEC) { return SPEC && SPEC.LTSSM && SPEC.LTSSM.migrate ? SPEC.LTSSM.migrate(P) : { P, migrated: false }; }
   function validate(P, SPEC) {
@@ -102,9 +102,11 @@
     if (!["up", "down", "left", "right"].includes(P.dir)) err.push("방향 오류");
     if (!LTSSM.includes(P.ltssm)) err.push("LTSSM 상태 오류");
     if (!int(P.gen, 1, 7) || ![1, 2, 4, 8, 16].includes(P.width)) err.push("Gen/폭 오류");
-    if (!int(P.chapter, 1, 7)) err.push("챕터 오류");
+    if (!int(P.chapter, 1, 12)) err.push("챕터 오류");
     if (!Array.isArray(P.badges) || P.badges.some((b) => !BADGES.includes(b))) err.push("배지 오류");
     if (P.badges && P.badges.includes("dl") && !P.badges.includes("l0")) err.push("배지 순서 오류");
+    // 마을 관장 배지는 순서대로만 (g2 ← l0, gN ← gN-1, champ ← g10)
+    if (Array.isArray(P.badges)) for (let n = 2; n <= 11; n++) { const b = n === 11 ? "champ" : "g" + n, prev = n === 2 ? "l0" : "g" + (n - 1); if (P.badges.includes(b) && !P.badges.includes(prev)) { err.push("배지 순서 오류"); break; } }
     if (P.badges && P.badges.length && P.ltssm !== "L0") err.push("배지-LTSSM 불일치");
     if (!Array.isArray(P.moves)) err.push("기술 오류");
     if (typeof P.items !== "object" || Object.values(P.items).some((n) => !int(n, 0, 999))) err.push("아이템 오류");
@@ -137,10 +139,10 @@
     const rules = Object.values(P.rules || {}).filter((v) => v >= 2).length;
     return { answered: n, correct: ok, acc: n ? ok / n : 0, concepts: Object.keys(P.learned || {}).length, badges: (P.badges || []).length, sbadges: (P.sbadges || []).length, rules, lv: P.lv, playMin: Math.round((P.playMs || 0) / 60000) };
   }
-  /* 점수 = 레벨×100 + 관장 배지×500 + state 배지×200 + 습득 규칙×15 + 도감×30 + 정답×10 + 정확도 보너스(10문제 이상 답했을 때 정확도%×5) */
+  /* 점수 = 레벨×100 + 관장 배지×500 + 챔피언 3000 + state 배지×200 + 습득 규칙×15 + 도감×30 + 정답×10 + 정확도 보너스(10문제 이상 답했을 때 정확도%×5) */
   function computeScore(P) {
     const s = stats(P);
-    const parts = { level: s.lv * 100, badges: s.badges * 500, sbadges: s.sbadges * 200, rules: s.rules * 15, dex: s.concepts * 30, correct: s.correct * 10, accuracy: s.answered >= 10 ? Math.round(s.acc * 100) * 5 : 0 };
+    const parts = { level: s.lv * 100, badges: s.badges * 500, champ: (P.badges || []).includes("champ") ? 3000 : 0, sbadges: s.sbadges * 200, rules: s.rules * 15, dex: s.concepts * 30, correct: s.correct * 10, accuracy: s.answered >= 10 ? Math.round(s.acc * 100) * 5 : 0 };
     return Object.assign(s, { parts, score: Object.values(parts).reduce((a, b) => a + b, 0) });
   }
   /* 닉네임: 2~12자, 한글/영문/숫자/_/- */
