@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=3.1">
+<link rel="stylesheet" href="style.css?v=3.1.1">
 </head>
 <body>
 <div id="app">
@@ -21,11 +21,13 @@
       <canvas id="cv" width="640" height="576"></canvas>
       <div id="panel" class="hidden"><div id="ptitle"></div><div id="plist"></div></div>
     </div>
-    <div id="console" class="box">
-      <div id="cname"></div>
-      <div id="ctext"></div>
-      <div id="csub"></div>
-      <div id="clist"></div>
+    <div id="cframe" class="box">
+      <div id="console">
+        <div id="cname"></div>
+        <div id="ctext"></div>
+        <div id="csub"></div>
+        <div id="clist"></div>
+      </div>
       <div id="carrow">▼</div>
     </div>
   </div>
@@ -46,16 +48,16 @@
     </div>
   </div>
 </div>
-<script src="js/data.js?v=3.1"></script>
-<script src="js/ltssm_q1.js?v=3.1"></script>
-<script src="js/ltssm_q2.js?v=3.1"></script>
-<script src="js/ltssm_q3.js?v=3.1"></script>
-<script src="js/ltssm.js?v=3.1"></script>
-<script src="js/ltssm_ui.js?v=3.1"></script>
-<script src="js/savecode.js?v=3.1"></script>
-<script src="js/engine.js?v=3.1"></script>
-<script src="js/online.js?v=3.1"></script>
-<script src="js/story.js?v=3.1"></script>
+<script src="js/data.js?v=3.1.1"></script>
+<script src="js/ltssm_q1.js?v=3.1.1"></script>
+<script src="js/ltssm_q2.js?v=3.1.1"></script>
+<script src="js/ltssm_q3.js?v=3.1.1"></script>
+<script src="js/ltssm.js?v=3.1.1"></script>
+<script src="js/ltssm_ui.js?v=3.1.1"></script>
+<script src="js/savecode.js?v=3.1.1"></script>
+<script src="js/engine.js?v=3.1.1"></script>
+<script src="js/online.js?v=3.1.1"></script>
+<script src="js/story.js?v=3.1.1"></script>
 <script>
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   var hadCtl = !!navigator.serviceWorker.controller, reloaded = false;

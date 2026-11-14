@@ -8,7 +8,9 @@ body { font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgu
 #screen { position: relative; width: 100%; aspect-ratio: 10 / 9; background: #000; border: 4px solid #0d160d; border-radius: 6px 6px 2px 2px; overflow: hidden; flex-shrink: 0; }
 #cv { width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
 .box { background: #f8f8e8; border: 4px double #203820; border-radius: 6px; box-shadow: inset 0 0 0 2px #f8f8e8, inset 0 0 0 4px #88a070; }
-#console { flex: 1; margin-top: 6px; padding: 10px 12px 8px; min-height: 120px; overflow-y: auto; position: relative; font-size: 15px; line-height: 1.5; }
+/* 콘솔: 바깥 프레임(#cframe)이 테두리를 그리고, 안쪽 #console만 스크롤 → 내용이 테두리 위/밖으로 그려지지 않음 */
+#cframe { flex: 1; margin-top: 6px; min-height: 120px; position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 4px; }
+#console { flex: 1; min-height: 0; padding: 6px 8px 4px; overflow-y: auto; overflow-x: hidden; position: relative; font-size: 15px; line-height: 1.5; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 #cname { font-weight: 800; color: #305830; font-size: 13px; }
 #cname:empty { display: none; }
 #ctext { white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
@@ -20,7 +22,7 @@ body { font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgu
 #clist .opt.ok { border-color: #2a8a2a; background: #d6f5d0; }
 #clist .opt.ng { border-color: #c03030; background: #fadcdc; }
 #clist.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px; }
-#carrow { position: absolute; right: 10px; bottom: 4px; font-size: 11px; color: #305830; animation: blink 0.8s infinite; display: none; }
+#carrow { position: absolute; right: 12px; bottom: 6px; z-index: 3; font-size: 11px; color: #305830; animation: blink 0.8s infinite; display: none; }
 #carrow.on { display: block; }
 @keyframes blink { 50% { opacity: 0; } }
 .hdr { font-size: 12px; color: #305830; font-weight: 700; margin-bottom: 2px; }

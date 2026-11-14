@@ -162,7 +162,7 @@
   });
   // 콘솔 탭 = 대사 넘기기 (대사 중일 때만; 선택지/퀴즈 중 탭·스크롤로 답이 골라지던 문제 방지). click이라 스크롤 드래그엔 반응 안 함.
   let sayActive = false;
-  elConsole.addEventListener("click", (e) => { if (e.target.closest(".opt, input, textarea, button, a, .nogo")) return; if (handler && sayActive) press("A"); });
+  ($("cframe") || elConsole).addEventListener("click", (e) => { if (e.target.closest(".opt, input, textarea, button, a, .nogo")) return; if (handler && sayActive) press("A"); });
   document.addEventListener("gesturestart", (e) => e.preventDefault());
   const heldDir = () => (lastDir && held[lastDir] ? lastDir : ["up", "down", "left", "right"].find((d) => held[d]) || null);
 
