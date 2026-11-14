@@ -1,0 +1,49 @@
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: #1b2a1b; overflow: hidden; overscroll-behavior: none; }
+body { font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; color: #102010;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+#app { height: 100%; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top) 6px env(safe-area-inset-bottom) 6px; background: #2c3e2c; }
+#top { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-top: 6px; position: relative; }
+#screen { position: relative; width: 100%; aspect-ratio: 10 / 9; background: #000; border: 4px solid #0d160d; border-radius: 6px 6px 2px 2px; overflow: hidden; flex-shrink: 0; }
+#cv { width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+.box { background: #f8f8e8; border: 4px double #203820; border-radius: 6px; box-shadow: inset 0 0 0 2px #f8f8e8, inset 0 0 0 4px #88a070; }
+#console { flex: 1; margin-top: 6px; padding: 10px 12px 8px; min-height: 120px; overflow-y: auto; position: relative; font-size: 15px; line-height: 1.5; }
+#cname { font-weight: 800; color: #305830; font-size: 13px; }
+#cname:empty { display: none; }
+#ctext { white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+#clist { margin-top: 4px; }
+#clist .opt { padding: 7px 8px 7px 22px; margin: 3px 0; border-radius: 4px; position: relative; border: 2px solid #c8d8b0; background: #fff; font-size: 14.5px; }
+#clist .opt.sel { border-color: #305830; background: #e8f4d0; }
+#clist .opt.sel::before { content: "▶"; position: absolute; left: 6px; color: #305830; font-size: 11px; top: 9px; }
+#clist .opt.off { color: #aaa; text-decoration: line-through; background: #eee; }
+#clist .opt.ok { border-color: #2a8a2a; background: #d6f5d0; }
+#clist .opt.ng { border-color: #c03030; background: #fadcdc; }
+#clist.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px; }
+#carrow { position: absolute; right: 10px; bottom: 4px; font-size: 11px; color: #305830; animation: blink 0.8s infinite; display: none; }
+#carrow.on { display: block; }
+@keyframes blink { 50% { opacity: 0; } }
+.hdr { font-size: 12px; color: #305830; font-weight: 700; margin-bottom: 2px; }
+#panel { position: absolute; inset: 0; background: #f8f8e8; padding: 8px; overflow-y: auto; font-size: 14px; }
+#panel.hidden { display: none; }
+#ptitle { font-weight: 800; color: #203820; border-bottom: 2px solid #88a070; margin-bottom: 4px; padding-bottom: 3px; }
+#plist .it { padding: 5px 6px; border-radius: 4px; border: 2px solid transparent; }
+#plist .it.sel { border-color: #305830; background: #e8f4d0; }
+#plist .it.sec { font-weight: 800; color: #6a5020; margin-top: 6px; padding: 2px 4px; border: none; }
+#plist .it.lock { color: #999; }
+#controls { height: 190px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 10px; }
+#dpad { display: grid; grid-template-columns: 52px 52px 52px; grid-template-rows: 52px 52px 52px; }
+.dp { background: #1a1a1a; color: #666; border: none; font-size: 16px; padding: 0; touch-action: none; }
+.dp.up { grid-column: 2; grid-row: 1; border-radius: 8px 8px 0 0; }
+.dp.left { grid-column: 1; grid-row: 2; border-radius: 8px 0 0 8px; }
+.dp.mid { grid-column: 2; grid-row: 2; background: #1a1a1a; }
+.dp.right { grid-column: 3; grid-row: 2; border-radius: 0 8px 8px 0; }
+.dp.down { grid-column: 2; grid-row: 3; border-radius: 0 0 8px 8px; }
+.dp.on, .btn.on, .pill.on { filter: brightness(1.8); }
+#mid { display: flex; flex-direction: column; align-self: flex-end; margin-bottom: 18px; }
+.pill { background: #555; color: #ddd; border: none; border-radius: 12px; font-size: 10px; padding: 6px 12px; letter-spacing: 1px; touch-action: none; }
+#ab { position: relative; width: 140px; height: 120px; }
+.btn { position: absolute; width: 62px; height: 62px; border-radius: 50%; border: none; background: #a8203c; color: #f0c0c8;
+  font-weight: 800; font-size: 20px; box-shadow: 0 3px 0 #500; touch-action: none; }
+.btn.a { right: 0; top: 4px; } .btn.b { left: 4px; top: 46px; }
+@media (min-height: 900px) { #controls { height: 210px; } }

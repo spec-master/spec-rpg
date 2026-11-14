@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>SPEC 몬스터 골드 — PCIe/CXL RPG</title>
+<meta name="theme-color" content="#1b2a1b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SPEC몬">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div id="screen">
+      <canvas id="cv" width="640" height="576"></canvas>
+      <div id="panel" class="hidden"><div id="ptitle"></div><div id="plist"></div></div>
+    </div>
+    <div id="console" class="box">
+      <div id="cname"></div>
+      <div id="ctext"></div>
+      <div id="clist"></div>
+      <div id="carrow">▼</div>
+    </div>
+  </div>
+  <div id="controls">
+    <div id="dpad">
+      <button class="dp up" data-b="up">▲</button>
+      <button class="dp left" data-b="left">◀</button>
+      <div class="dp mid"></div>
+      <button class="dp right" data-b="right">▶</button>
+      <button class="dp down" data-b="down">▼</button>
+    </div>
+    <div id="mid">
+      <button class="pill" data-b="START">START</button>
+    </div>
+    <div id="ab">
+      <button class="btn b" data-b="B">B</button>
+      <button class="btn a" data-b="A">A</button>
+    </div>
+  </div>
+</div>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/story.js"></script>
+<script>
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>
