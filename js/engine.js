@@ -115,6 +115,7 @@
   const SN = (st) => (st ? t(st.name, st.en) : ""); G.sn = SN;
   const IN = (it) => (it ? t(it.name, it.en) : ""), ID = (it) => (it ? t(it.desc, it.descEn) : "");
   const MD = (m) => t(m.desc, m.descEn);
+  const TTL = (x) => (x && G.ttl ? G.ttl(x) : x);
   const RT = (rid) => { const r = S.LTSSM.RULES[rid]; return r ? t(r.text, r.en) : rid; };
   const TAGC = { PCIe: "pc", CXL: "cx", "공통": "cm", "CXL/공통": "cx" };
   const tagHTML = (tg) => tg ? `<span class="tag t${TAGC[tg] || "pc"}">${tg === "공통" ? t("공통", "Common") : tg === "CXL/공통" ? t("CXL/공통", "CXL/Common") : tg}</span>` : "";
@@ -233,7 +234,7 @@
       let finished = false;
       function finish(i) { if (finished) return; finished = true; handler = null; resolve(i); }
       if (!els.length) { // 선택지가 없으면 안내 후 A/B로 취소(-1) — 빈 화면에서 멈추지 않도록
-        const d = document.createElement("div"); d.className = "hdr"; d.textContent = opts.empty || "(선택할 항목이 없다 — A/B: 돌아가기)"; elList.appendChild(d);
+        const d = document.createElement("div"); d.className = "hdr"; d.textContent = opts.empty || t("(선택할 항목이 없다 — A/B: 돌아가기)", "(Nothing here — A/B: back)"); elList.appendChild(d);
         handler = (b) => { if (b === "A" || b === "B") finish(-1); }; return;
       }
       render();
@@ -387,7 +388,7 @@
   function drawTitle() {
     ctx.fillStyle = "#1b2a1b"; ctx.fillRect(0, 0, 160, 144);
     for (let i = 0; i < 16; i++) { ctx.fillStyle = i % 2 ? "#2c4a2c" : "#244024"; ctx.fillRect(0, 100 + ((i * 7 + animT / 2) % 44), 160, 1); }
-    text("SPEC 몬스터", 30, 40, 16, "#f0c040"); text("골드 · PCIe/CXL 편", 40, 56, 9, "#f8f8e8");
+    text(t("SPEC 몬스터", "SPEC MONSTERS"), 30, 40, 16, "#f0c040"); text(t("골드 · PCIe/CXL 편", "Gold · PCIe/CXL"), 40, 56, 9, "#f8f8e8");
     ctx.drawImage(monSprite("ltssmdrake"), 60, 64);
   }
   let lastT = performance.now();
@@ -418,25 +419,25 @@
     for (const id of ids) {
       if (P.learned[id] || !S.CONCEPTS[id]) continue;
       P.learned[id] = Date.now();
-      if (!silent) await G.say(`📗 spec 도감에 「${S.CONCEPTS[id].name}」 등록!\n${S.CONCEPTS[id].note}`);
+      if (!silent) await G.say(t(`📗 spec 도감에 「${S.CONCEPTS[id].name}」 등록!\n${S.CONCEPTS[id].note}`, `📗 Spec note added: 「${S.CONCEPTS[id].en || S.CONCEPTS[id].name}」`));
     }
     await G.checkGrowth();
   };
   const RATE = { 1: "2.5 GT/s · 8b/10b", 2: "5.0 GT/s · 8b/10b", 3: "8.0 GT/s · 128b/130b", 4: "16.0 GT/s · 128b/130b", 5: "32.0 GT/s · 128b/130b", 6: "64.0 GT/s · PAM4 1b/1b · FLIT", 7: "128.0 GT/s · PAM4 1b/1b · FLIT" };
   const L = (id) => !!P.learned[id];
   const LT_ORDER = ["Detect", "Polling", "Configuration", "L0"];
-  G.setLTSSM = async function (st, msg) { if (LT_ORDER.indexOf(st) <= LT_ORDER.indexOf(P.ltssm)) return; P.ltssm = st; await G.say(msg || `🔗 LTSSM 상태가 ${st}(으)로 전이했다!`); await G.checkGrowth(); };
+  G.setLTSSM = async function (st, msg) { if (LT_ORDER.indexOf(st) <= LT_ORDER.indexOf(P.ltssm)) return; P.ltssm = st; await G.say(msg || t(`🔗 LTSSM 상태가 ${st}(으)로 전이했다!`, `🔗 LTSSM moved to ${st}!`)); await G.checkGrowth(); };
   const moveReqText = (m) => m.req ? t(`「${SN(stateOf(m.req.s))}」 규칙 ${m.req.n}개 습득`, `${m.req.n} rules of ${SN(stateOf(m.req.s))}`) : m.concept ? `「${S.CONCEPTS[m.concept].name}」 개념 학습` : "";
   const moveReqMet = (m) => m.req ? stateDone(m.req.s) >= m.req.n : m.concept ? L(m.concept) : true;
   G.checkGrowth = async function () {
     // LTSSM 진행 = state 배지
-    if (hasSB("det") && P.ltssm === "Detect") await G.setLTSSM("Polling", "🔗 LTSSM: Detect → Polling\n상대 Receiver 감지 완료! 이제 TS1/TS2로 lock을 맞출 차례.");
-    if (hasSB("pol") && P.ltssm === "Polling") await G.setLTSSM("Configuration", "🔗 LTSSM: Polling → Configuration\nbit/symbol lock 성공! Link·Lane 번호를 정하자.");
-    if ((hasSB("cfg") || P.badges.includes("l0")) && P.ltssm !== "L0") await G.setLTSSM("L0", "🔗 LTSSM: Configuration → L0 (2.5 GT/s)\n링크 업! 속도는 Recovery를 거쳐 올린다.");
+    if (hasSB("det") && P.ltssm === "Detect") await G.setLTSSM("Polling", t("🔗 LTSSM: Detect → Polling\n상대 Receiver 감지 완료! 이제 TS1/TS2로 lock을 맞출 차례.", "🔗 LTSSM: Detect → Polling\nReceiver detected! Now lock with TS1/TS2."));
+    if (hasSB("pol") && P.ltssm === "Polling") await G.setLTSSM("Configuration", t("🔗 LTSSM: Polling → Configuration\nbit/symbol lock 성공! Link·Lane 번호를 정하자.", "🔗 LTSSM: Polling → Configuration\nBit/Symbol lock achieved! Time to set Link and Lane numbers."));
+    if ((hasSB("cfg") || P.badges.includes("l0")) && P.ltssm !== "L0") await G.setLTSSM("L0", t("🔗 LTSSM: Configuration → L0 (2.5 GT/s)\n링크 업! 속도는 Recovery를 거쳐 올린다.", "🔗 LTSSM: Configuration → L0 (2.5 GT/s)\nLink up! Speed changes go through Recovery."));
     // Link 폭: L0 이후 레벨에 따라
     let w = 1;
     if (P.ltssm === "L0") w = P.lv >= 12 ? 16 : P.lv >= 8 ? 8 : P.lv >= 5 ? 4 : P.lv >= 3 ? 2 : 1;
-    if (w > P.width) { P.width = w; await G.say(`↔️ Configuration 재협상! Link 폭이 x${w}(으)로 넓어졌다.\n(폭 2배 = 대역폭 2배)`); }
+    if (w > P.width) { P.width = w; await G.say(t(`↔️ Configuration 재협상! Link 폭이 x${w}(으)로 넓어졌다.\n(폭 2배 = 대역폭 2배)`, `↔️ Width renegotiated! Link is now x${w}.\n(2× width = 2× bandwidth)`)); }
     // Gen 속도: Recovery 배지(속도 변경) · Equalization 배지(8 GT/s+) · L0p 배지(Flit) 필요
     let g = 1;
     if (P.ltssm === "L0") {
@@ -450,7 +451,7 @@
     }
     if (g > P.gen) {
       P.gen = g;
-      await G.say([`⚡ Recovery.Speed 진입${g >= 3 ? " → Recovery.Equalization" : ""}...`, `Link가 Gen${g} (${RATE[g]})(으)로 속도를 올렸다! 공격력 상승!`]);
+      await G.say([t(`⚡ Recovery.Speed 진입${g >= 3 ? " → Recovery.Equalization" : ""}...`, `⚡ Entering Recovery.Speed${g >= 3 ? " → Recovery.Equalization" : ""}...`), t(`Link가 Gen${g} (${RATE[g]})(으)로 속도를 올렸다! 공격력 상승!`, `Link sped up to Gen${g} (${RATE[g]})! Attack up!`)]);
     }
     for (const mo of S.MOVES) {
       if (P.moves.includes(mo.id)) continue;
@@ -505,7 +506,7 @@
       const chk = ACH_CHECK[a.id] || (a.test && (() => a.test(P)));
       if (P.ach.includes(a.id) || !chk || !chk()) continue;
       P.ach.push(a.id); if (!P.title) P.title = a.title;
-      window.LUI && (LUI.sfx("ach"), LUI.toast(`🏆 업적 「${a.name}」<br><small>칭호 「${a.title}」 획득</small>`, "ach"));
+      window.LUI && (LUI.sfx("ach"), LUI.toast(t(`🏆 업적 「${a.name}」<br><small>칭호 「${a.title}」 획득</small>`, `🏆 Achievement 「${a.nameEn || a.name}」<br><small>Title 「${a.titleEn || a.title}」 unlocked</small>`), "ach"));
       await sleep(250);
     }
   };
@@ -565,7 +566,7 @@
   async function battle0(opt, prevMode) {
     await flash(3); G.mode = "battle"; document.body.classList.add("battle");
     B = { enemy: null, ehp: 0, emax: 0, eShake: 0, pShake: 0, eBlink: 0, eSlide: 60, eVisible: true, replay: false, wrong: 0, combo: 0, dmgTaken: 0,
-      title: opt.kind === "boss" ? "★ 관장전 ★" : opt.kind === "trainer" ? "트레이너 배틀" : "" };
+      title: opt.kind === "boss" ? t("★ 관장전 ★", "★ Gym Leader ★") : opt.kind === "trainer" ? t("트레이너 배틀", "Trainer battle") : "" };
     let result = "win";
     outer: for (let ti = 0; ti < opt.team.length; ti++) {
       const id = opt.team[ti], m = S.MONSTERS[id];
@@ -574,7 +575,7 @@
       const atk = m.ltssm ? Math.round(4 + P.lv * 0.9 + (m.boss ? 3 : 0)) : m.atk;
       B.enemy = Object.assign({ id }, m, { atk }); B.emax = B.ehp = hp; B.eVisible = true; B.eSlide = 60;
       for (let k = 0; k < 15; k++) { B.eSlide -= 4; await sleep(16); } B.eSlide = 0;
-      const msub = t(m.sub, m.subEn), trn = Array.isArray(opt.trainer) ? t(opt.trainer[0], opt.trainer[1]) : opt.trainer;
+      const msub = t(m.sub, m.subEn), trn = Array.isArray(opt.trainer) ? t(opt.trainer[0], opt.trainer[1]) : G.tr ? G.tr(opt.trainer) : opt.trainer;
       await G.say(opt.kind === "wild" ? t(`야생의 ${NM(m)}이(가) 나타났다!`, `A wild ${NM(m)} appeared!`) + (msub ? `\n(${msub})` : "") : t(`${trn}은(는) ${NM(m)}을(를) 내보냈다!`, `${trn} sent out ${NM(m)}!`));
       while (B.ehp > 0 && P.hp > 0) {
         const acts = [t("기술", "Moves"), t("가방", "Bag"), t("도망", "Run")];
@@ -626,7 +627,7 @@
     const it = S.ITEMS[id];
     if (it.heal) { if (P.hp >= maxHP()) { await G.say(t("HP가 이미 가득하다.", "HP is already full.")); return false; } const before = P.hp; P.hp = Math.min(maxHP(), P.hp + it.heal); P.items[id]--; await G.say(t(`${IN(it)} 사용! HP ${P.hp - before} 회복.`, `Used ${IN(it)}! Recovered ${P.hp - before} HP.`)); return true; }
     if (id === "replay_buf") { if (!inBattle) { await G.say(t("전투 중에만 쓸 수 있다.", "Only usable in battle.")); return false; } B.replay = true; P.items[id]--; await G.say(t("Replay Buffer 장전! 다음 오답은 Nak → 재전송으로 한 번 더 도전할 수 있다.", "Replay Buffer loaded! Your next wrong answer gets a Nak → replay retry.")); return true; }
-    if (id === "msix_table") { await G.say(["📨 MSI-X vector로 Root 박사님께 Memory Write 인터럽트 전송!", G.hint ? G.hint() : "..."], "Root 박사"); return false; }
+    if (id === "msix_table") { await G.say([t("📨 MSI-X vector로 Root 박사님께 Memory Write 인터럽트 전송!", "📨 Sent an MSI-X Memory Write interrupt to Dr. Root!"), G.hint ? G.hint() : "..."], t("Root 박사", "Dr. Root")); return false; }
     await G.say(ID(it)); return false;
   }
   G.useItem = useItem;
@@ -737,7 +738,7 @@
     const items = [
       { label: `Lv ${P.lv}   EXP ${P.xp}/${xpNeed(P.lv)}`, bar: P.xp / xpNeed(P.lv), desc: t("정답으로 몬스터를 쓰러뜨리면 경험치를 얻는다. 콤보·퍼펙트 배틀이면 보너스!", "Defeat monsters with correct answers for EXP. Combos and perfect battles give bonuses!") },
       { label: `HP ${P.hp}/${maxHP()}`, bar: P.hp / maxHP(), desc: t("오답을 고르면 몬스터의 반격으로 HP가 줄어든다. 0이 되면 Link Down → Hot Reset.", "Wrong answers let the monster strike back. At 0 HP: Link Down → Hot Reset.") },
-      { label: `${t("칭호", "Title")}: ${P.title || "-"}`, desc: t("업적을 달성하면 칭호를 얻는다.", "Achievements unlock titles.") },
+      { label: `${t("칭호", "Title")}: ${TTL(P.title) || "-"}`, desc: t("업적을 달성하면 칭호를 얻는다.", "Achievements unlock titles.") },
       { label: `${t("현재 마을", "Town")}: ${cur.n}. ${townName(cur)}`, bar: townProgress(cur.n), desc: t(`이 마을 규칙 진행 ${Math.round(townProgress(cur.n) * 100)}%`, `Rule progress here ${Math.round(townProgress(cur.n) * 100)}%`) },
       { label: `LTSSM: ${P.ltssm}`, desc: t("Detect 배지 → Polling, Polling 배지 → Configuration, Configuration 배지 → L0(2.5 GT/s).", "Detect badge → Polling, Polling badge → Configuration, Configuration badge → L0 (2.5 GT/s).") },
       { label: `${t("속도", "Speed")}: Gen${P.gen} (${RATE[P.gen]})`, desc: t("L0 이후 Recovery 배지(속도 변경), Equalization 배지(8 GT/s 이상), L0p 배지(Flit, 64/128 GT/s)와 레벨이 필요하다.", "After L0: the Recovery badge (speed change), Equalization badge (8 GT/s+), L0p badge (Flit, 64/128 GT/s) and levels.") },
@@ -764,7 +765,7 @@
       });
     });
     const rs = statesOf(tn).reduce((a, st) => a.concat(Object.keys(st.rules)), []), done = rs.filter(ruleOK).length;
-    await G.panel(`${t("규칙 도감", "Rule dex")} ${tn}${t("번 마을", "")} ${done}/${rs.length}`, items);
+    await G.panel(`${t(`규칙 도감 ${tn}번 마을`, `Rule dex · Town ${tn}`)} ${done}/${rs.length}`, items);
   }
   async function badgeCase() {
     const tn = await pickTown(t("어느 마을의 배지 케이스?", "Badges of which town?")); if (tn < 0) return;
@@ -791,10 +792,10 @@
   }
   async function achPanel() {
     while (true) {
-      const items = LT.ACH.map((a) => { const got = P.ach.includes(a.id); return { label: `${got ? "🏆" : "🔒"} ${a.name}${got && P.title === a.title ? t("  (장착 중)", "  (equipped)") : ""}`, lock: !got, desc: `${a.desc}\n${t("칭호", "Title")}: 「${got ? a.title : "???"}」${got ? t("\n(A: 칭호 장착)", "\n(A: equip title)") : ""}` }; });
-      const k = await G.panel(`${t("업적", "Achievements")} ${P.ach.length}/${LT.ACH.length} · ${t("칭호", "Title")} 「${P.title || "-"}」`, items, { selectable: true });
+      const items = LT.ACH.map((a) => { const got = P.ach.includes(a.id); return { label: `${got ? "🏆" : "🔒"} ${t(a.name, a.nameEn)}${got && P.title === a.title ? t("  (장착 중)", "  (equipped)") : ""}`, lock: !got, desc: `${t(a.desc, a.descEn)}\n${t("칭호", "Title")}: 「${got ? t(a.title, a.titleEn) : "???"}」${got ? t("\n(A: 칭호 장착)", "\n(A: equip title)") : ""}` }; });
+      const k = await G.panel(`${t("업적", "Achievements")} ${P.ach.length}/${LT.ACH.length} · ${t("칭호", "Title")} 「${TTL(P.title) || "-"}」`, items, { selectable: true });
       if (k < 0) return;
-      const a = LT.ACH[k]; if (P.ach.includes(a.id)) { P.title = a.title; window.LUI && LUI.toast(t(`칭호 「${a.title}」 장착!`, `Title 「${a.title}」 equipped!`)); }
+      const a = LT.ACH[k]; if (P.ach.includes(a.id)) { P.title = a.title; window.LUI && LUI.toast(t(`칭호 「${a.title}」 장착!`, `Title 「${a.titleEn || a.title}」 equipped!`)); }
     }
   }
   async function statsPanel() {

@@ -42,8 +42,8 @@
   }
   const LTS = S.LTSSM;
   const stName = (id) => LTS.STATES.find((s) => s.id === id).name;
-  const famIntro = (ids) => ids.map((id) => `· ${stName(id)}: ${LTS.STATES.find((s) => s.id === id).intro}`).join("\n");
-  function areaSign(title, fams, extra) { return async () => { await say([`【${title}】\n${famIntro(fams)}`, extra || "풀숲에서 몬스터를 만나 퀴즈로 규칙을 익히자. 규칙마다 2번 맞히면 습득, state의 규칙을 다 모으면 배지!"]); }; }
+  const famIntro = (ids) => ids.map((id) => { const st = LTS.STATES.find((s) => s.id === id); return `· ${G.sn(st)}: ${G.t(st.intro, st.introEn)}`; }).join("\n");
+  function areaSign(title, fams, extra) { return async () => { await say([`【${G.tr(title)}】\n${famIntro(fams)}`, extra || "풀숲에서 몬스터를 만나 퀴즈로 규칙을 익히자. 규칙마다 2번 맞히면 습득, state의 규칙을 다 모으면 배지!"]); }; }
 
   /* ===================== 연구소 ===================== */
   G.maps.lab = {
@@ -66,20 +66,20 @@
     await say(["막히면 가방에서 MSI-X 표를 써서 나에게 인터럽트를 보내라. 메뉴(B/START)의 규칙 도감·배지 케이스로 진행 상황도 볼 수 있단다.", "먼저 서쪽 Detect 초원부터 가 보거라!"], "Root 박사");
   }
   G.hint = () => {
-    const p = G.P(); const core = LTS.CORE.filter((s) => !p.sbadges.includes(s));
-    if (!G.flag("metProf")) return "연구소의 Root 박사에게 말을 걸어라.";
+    const p = G.P(), t = G.t, n = (id) => `(${G.stateDone(id)}/${G.stateTot(id)})`;
+    if (!G.flag("metProf")) return t("연구소의 Root 박사에게 말을 걸어라.", "Talk to Dr. Root in the lab.");
     if (!p.badges.includes("l0")) {
-      if (!p.sbadges.includes("det")) return `서쪽 Detect 초원에서 Detect 규칙을 모아라. (${G.stateDone("det")}/${G.stateTot("det")})`;
-      if (!p.sbadges.includes("pol")) return `Detect 초원 북쪽 Polling 숲으로! (${G.stateDone("pol")}/${G.stateTot("pol")})`;
-      if (!p.sbadges.includes("cfg")) return `마을 동쪽 Configuration 협곡으로! (${G.stateDone("cfg")}/${G.stateTot("cfg")})`;
-      if (!p.sbadges.includes("rec")) return `협곡 동쪽 끝 Recovery 동굴로! (${G.stateDone("rec")}/${G.stateTot("rec")})`;
-      if (!p.sbadges.includes("l0")) return `남쪽 Power 호수의 L0 몬스터들과 싸워라. (${G.stateDone("l0")}/${G.stateTot("l0")})`;
-      if (p.lv < 10) return `핵심 배지 완료! Lv10까지 레벨을 올려라 (현재 Lv${p.lv}). 시련의 탑의 Hot Reset·Loopback·Disabled도 좋은 수련이다.`;
-      return "모든 조건 충족! 마을 오른쪽 위 LTSSM 체육관 관장에게 도전하라!" + (core.length ? "" : "");
+      if (!p.sbadges.includes("det")) return t(`서쪽 Detect 초원에서 Detect 규칙을 모아라. ${n("det")}`, `Collect Detect rules in Detect Meadow to the west. ${n("det")}`);
+      if (!p.sbadges.includes("pol")) return t(`Detect 초원 북쪽 Polling 숲으로! ${n("pol")}`, `On to Polling Forest, north of Detect Meadow! ${n("pol")}`);
+      if (!p.sbadges.includes("cfg")) return t(`마을 동쪽 Configuration 협곡으로! ${n("cfg")}`, `On to Configuration Canyon, east of town! ${n("cfg")}`);
+      if (!p.sbadges.includes("rec")) return t(`협곡 동쪽 끝 Recovery 동굴로! ${n("rec")}`, `On to Recovery Cave at the canyon's east end! ${n("rec")}`);
+      if (!p.sbadges.includes("l0")) return t(`남쪽 Power 호수의 L0 몬스터들과 싸워라. ${n("l0")}`, `Battle the L0 monsters at Power Lake to the south. ${n("l0")}`);
+      if (p.lv < 10) return t(`핵심 배지 완료! Lv10까지 레벨을 올려라 (현재 Lv${p.lv}). 시련의 탑의 Hot Reset·Loopback·Disabled도 좋은 수련이다.`, `Core badges done! Reach Lv10 (now Lv${p.lv}). Hot Reset, Loopback and Disabled at the Tower of Trials are good training.`);
+      return t("모든 조건 충족! 마을 오른쪽 위 LTSSM 체육관 관장에게 도전하라!", "All requirements met! Challenge the leader of the LTSSM Gym in the top-right of town!");
     }
-    if (!p.badges.includes("dl")) return `시련의 탑 북쪽 DLL 1번 도로를 지나 Replay 체육관에 도전! (권장 Lv12+)`;
-    return "Transaction 시티로! Transaction 학교와 CXL 박사를 찾아가라. (3장 이후는 프로토타입 단계)";
+    return t("LTSSM 마스터! 시련의 탑 북쪽 길로 2번 마을 Flit 항구에 가자.", "LTSSM Master! Take the road north of the Tower to Town 2, Flit Harbor.");
   };
+
   G.onNewGame = async () => {
     await say(["…… 신호가 없다.", "너는 막 전원이 들어온 PCIe Link다. 아직 아무 상대도 감지하지 못했다.\n(LTSSM 상태: Detect)", "앞에 있는 박사님에게 말을 걸어 보자. (A 버튼)"]);
   };
@@ -181,7 +181,7 @@
     npcs: [
       trainer("t_cfg1", { name: "Lane 소년", sight: 3, npc: { x: 10, y: 7, dir: "down", look: LOOK.boy },
         intro: ["Link 번호, Lane 번호, 그리고 폭! Configuration은 내 전문이야!"], team: ["widthsnake", "lanenaga"],
-        win: "Lane Reversal까지 아는구나…", after: "Configuration은 언제나 2.5 GT/s에서 진행돼. 속도는 L0 이후 Recovery로!" }),
+        win: "Lane Reversal까지 아는구나…", after: "초기 훈련의 Configuration은 2.5 GT/s에서 진행돼. 속도는 L0 이후 Recovery로!" }),
       trainer("t_cxl", { name: "CXL 탐험가", sight: 3, npc: { x: 21, y: 9, dir: "up", look: LOOK.sci },
         intro: ["Modified TS1/TS2로 Flex Bus 모드를 협상해 본 적 있나? CXL 4.0 퀴즈다!"], team: ["flexfish", "retimerfish"],
         win: "128 GT/s, 리타이머 4개… 완벽하군!", after: "CXL 4.0의 x2 native는 128 GT/s에서만이라는 걸 잊지 마." })
@@ -270,26 +270,26 @@
   };
 
   /* ===================== LTSSM 체육관 ===================== */
-  const gymMissing = () => { const p = G.P(); const miss = []; if (p.lv < 10) miss.push(`레벨 ${p.lv}/10`); LTS.CORE.forEach((s) => { if (!p.sbadges.includes(s)) miss.push(`${stName(s)} 배지 (규칙 ${G.stateDone(s)}/${G.stateTot(s)})`); }); return miss; };
+  const gymMissing = () => { const p = G.P(); const miss = []; if (p.lv < 10) miss.push(G.t(`레벨 ${p.lv}/10`, `Level ${p.lv}/10`)); LTS.CORE.forEach((s) => { if (!p.sbadges.includes(s)) miss.push(G.t(`${stName(s)} 배지 (규칙 ${G.stateDone(s)}/${G.stateTot(s)})`, `${stName(s)} badge (rules ${G.stateDone(s)}/${G.stateTot(s)})`)); }); return miss; };
   const leader = trainer("leader1", { name: "LTSSM 관장 하나", sight: -1, boss: true, npc: { x: 4, y: 2, dir: "down", look: LOOK.leader1 },
     intro: ["나는 LTSSM 관장 하나! Detect부터 Hot Reset까지, 링크 트레이닝의 모든 규칙을 시험하겠다.", "3마리 연속 승부다. 시작!"],
     team: ["kinggolem", "eqqueen", "ltssmdrake"], minD: 2, maxD: 3, xp: 90,
-    win: ["훌륭하다! 너는 LTSSM을 완전히 이해했다."], after: "L0 이후엔 Data Link Layer가 신뢰성을 책임진다. 시련의 탑 북쪽으로 가라!",
+    win: ["훌륭하다! 너는 LTSSM을 완전히 이해했다."], after: "L0 다음은 PHY와 Flit의 세계다. 시련의 탑 북쪽, 2번 마을 Flit 항구로 가라!",
     onWin: async () => {
       const p = G.P();
       G.addBadge("l0");
-      await window.LUI.badgePopup(Object.assign({ isMaster: true }, LTS.MASTER), "LTSSM 마스터 배지!", "다음 마을로 가는 길이 열렸다");
+      await window.LUI.badgePopup(Object.assign({ isMaster: true }, LTS.MASTER), G.tr("LTSSM 마스터 배지!"), G.tr("다음 마을로 가는 길이 열렸다"));
       G.clearConsole();
       if (p.flags.gym_nodmg_pending) { p.flags.gym_nodmg = true; }
       await G.checkGrowth();
       await G.giveItem("retimer", 1);
-      p.chapter = 2; await say("📖 2장 「Data Link Layer: 신뢰의 길」 시작! 시련의 탑 앞 경비원이 북쪽 길을 열어 줄 것이다.");
+      p.chapter = 2; await say("📖 2번 마을 「Flit 항구」로 가는 길이 열렸다! 시련의 탑 앞 경비원이 북쪽 길을 열어 줄 것이다.");
       await G.checkAch();
     } });
   const leaderTalk = leader.talk;
   leader.talk = async (n) => {
     const miss = gymMissing();
-    if (!G.flag("beat_leader1") && miss.length && !G.P().badges.includes("l0")) { await say(["도전자여, 아직 자격이 부족하다.", "부족한 것:\n" + miss.map((m) => "· " + m).join("\n")], "LTSSM 관장 하나"); return; }
+    if (!G.flag("beat_leader1") && miss.length && !G.P().badges.includes("l0")) { await say(["도전자여, 아직 자격이 부족하다.", G.t("부족한 것:\n", "Missing:\n") + miss.map((m) => "· " + m).join("\n")], "LTSSM 관장 하나"); return; }
     G.P().flags.gym_nodmg_pending = false;
     await leaderTalk(n);
   };
@@ -302,7 +302,7 @@
         const miss = gymMissing();
         if (G.P().badges.includes("l0")) { await say("LTSSM 마스터! 다음은 2번 마을 Flit 항구다. 시련의 탑 북쪽으로!", "체육관 안내원"); return; }
         if (!miss.length) { await say(["모든 조건 충족! 관장님께 도전할 수 있다.", "관장전은 Recovery·EQ·전체 LTSSM 문제가 나온다. 어려운 문제(★★ 이상)뿐이니 각오해!"], "체육관 안내원"); return; }
-        await say(["어이, 도전자! 관장에게 도전하려면 Lv10 + 핵심 배지 5개(Detect·Polling·Configuration·Recovery·L0)가 필요하다.", "지금 부족한 것:\n" + miss.map((m) => "· " + m).join("\n"), "체육관 안의 트레이너들과는 언제든 수련할 수 있다."], "체육관 안내원");
+        await say(["어이, 도전자! 관장에게 도전하려면 Lv10 + 핵심 배지 5개(Detect·Polling·Configuration·Recovery·L0)가 필요하다.", G.t("지금 부족한 것:\n", "Still missing:\n") + miss.map((m) => "· " + m).join("\n"), "체육관 안의 트레이너들과는 언제든 수련할 수 있다."], "체육관 안내원");
       } },
       trainer("t_g1a", { name: "x16 소년", sight: 3, npc: { x: 2, y: 8, dir: "right", look: LOOK.boy },
         intro: ["Lane이 16개면 뭐든 빠르지! 덤벼!"], team: ["completenaga", "lockgolem"],
