@@ -54,8 +54,11 @@ const ALLOW = [/한국어로/, /Hangul/, /^수집기 점검$/];
   await shot('town1_battle_en');
   if (HANGUL.test(qv.q) || qv.c.some((c) => HANGUL.test(c)) || qv.c.length !== 4) fails.push('question/choices: ' + JSON.stringify(qv));
   (await pg.$$('#clist .opt'))[0].tap(); await sleep(600);
+  const hd = await pg.evaluate(() => document.getElementById('ctext').textContent);
+  if (HANGUL.test(hd) || !/Correct|Wrong/.test(hd)) fails.push('result line: ' + hd.slice(0, 200));
+  for (let k = 0; k < 10 && !(await pg.evaluate(() => document.getElementById('ctext').textContent.startsWith('📘'))); k++) { await pg.evaluate(() => G.press('A')); await sleep(250); } await sleep(3000);
   const ex = await pg.evaluate(() => document.getElementById('ctext').textContent);
-  if (HANGUL.test(ex) || !/Correct|Wrong/.test(ex)) fails.push('explanation: ' + ex.slice(0, 200));
+  if (HANGUL.test(ex) || !/^📘 \S/.test(ex)) fails.push('explanation: ' + ex.slice(0, 200));
   await shot('town1_battle_explanation_en');
   // 여러 문제를 연속으로 풀어 본다
   for (let i = 0; i < 60; i++) { await sleep(90); const o = await opts(); if (await pg.evaluate(() => G.mode) !== 'battle') break;
