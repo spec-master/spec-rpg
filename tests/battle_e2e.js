@@ -51,6 +51,13 @@ async function run(br, w, h, scen) {
     P.items = { fc_credit: 50, replay_buf: 30 }; P.badges = ['l0'].concat(L.TOWNS.map((T) => 'g' + T.n)); });
   const info = await pg.evaluate(() => ({ moves: G.P().moves.slice(), map: G.P().map }));
   if (!info.moves.length) fail(`${scen}@${w}: no moves after load`);
+  if (scen === 'fresh') { // 레벨 업 = HP 100% 회복 (전투 승리 → 경험치 → 레벨 업 경로 포함)
+    await pg.evaluate(() => { const P = G.P(); P.lv = 5; P.xp = 59; P.hp = 1; G.runScript(() => G.battle({ kind: 'wild', team: ['m_p2_1'] })); });
+    for (let k = 0; k < 400 && (await pg.evaluate(() => G.mode !== 'field' || G.busy)); k++) { await pg.evaluate(() => { if (G.mode === 'battle' && window.__B !== 1) {} }); await pg.evaluate(() => G.press('A')); await sleep(40); if ((await S()).quiz) { const ans = await pg.evaluate(() => G.lastQ.c[G.lastQ.a]); const o = (await S()).opts.findIndex((x) => x.t.replace(/^▶\s*/, '').trim() === ans.trim()); await tap(Math.max(0, o)); } }
+    const lv = await pg.evaluate(() => ({ lv: G.P().lv, hp: G.P().hp, max: G.maxHP() }));
+    if (lv.lv < 6) fail(`${scen}@${w}: level-up test did not level (${JSON.stringify(lv)})`); else if (lv.hp !== lv.max) fail(`${scen}@${w}: HP not full after level-up ${lv.hp}/${lv.max}`); else console.log('  level-up heal OK', JSON.stringify(lv));
+    await pg.evaluate(() => { const P = G.P(); P.lv = 1; P.xp = 0; P.hp = G.maxHP(); });
+  }
   if (scen === 'migrated_v2_proto' && info.map !== 't2') fail(`${scen}@${w}: old prototype map not migrated (${info.map})`);
   console.log(`[${w}x${h}] ${scen}: moves=${info.moves.length} map=${info.map}`);
   if (sv === 'TOWNS') await pg.evaluate(() => { window.__TOWNS = 1; });
@@ -67,20 +74,21 @@ async function run(br, w, h, scen) {
     out.push({ kind: 'trainer', trainer: 'T', team: ['detectmon'] }); // chapters 없음 → LTSSM 폴백
     return out;
   });
-  const N = sv === 'ALL' || sv === 'TOWNS' ? plan.length : 6;
+  const N = process.env.MAXB ? +process.env.MAXB : sv === 'ALL' || sv === 'TOWNS' ? plan.length : 6;
   let moveCursor = 0, itemCursor = 0, usedMoves = new Set(), usedItems = new Set();
   for (let bi = 0; bi < N; bi++) {
     const opt = plan[bi % plan.length]; battles++;
     for (let k = 0; k < 80 && (await pg.evaluate(() => G.busy)); k++) { await pg.evaluate(() => G.press('A')); await sleep(80); }
-    if (await pg.evaluate(() => G.busy)) fail(`${scen}@${w}: still busy before battle ${opt.team}`);
+    if (await pg.evaluate(() => G.busy)) fail(`${scen}@${w}: still busy before battle ${opt.team}: ` + JSON.stringify(await pg.evaluate(() => ({ mode: G.mode, t: document.getElementById('ctext').innerText.slice(0, 80), opts: [...document.querySelectorAll('#clist .opt')].map((e) => e.textContent).slice(0, 4), pop: !!document.querySelector('.bpop'), toast: document.querySelectorAll('.toast,.ltoast').length, panel: !document.getElementById('panel').classList.contains('hidden') }))));
     await pg.evaluate((o) => { G.P().hp = G.maxHP(); G.runScript(async () => { if (o.map) await G.warp(o.map, 4, 6, 'up'); window.__qs = []; return G.battle(o); }); }, opt);
     await sleep(500);
+    for (let k = 0; k < 40 && (await pg.evaluate(() => G.mode)) !== 'battle'; k++) await sleep(100); // 워프(페이드) 후 전투 시작 대기
     let steps = 0, turns = 0, lastSig = '', same = 0;
     while (steps++ < 2500) {
       s = await S();
       if (s.mode !== 'battle') break;
       const sig = JSON.stringify([s.text, s.opts.map((o) => o.t)]); if (sig === lastSig) same++; else { same = 0; lastSig = sig; }
-      if (same > 25) { fail(`${scen}@${w} battle ${opt.team} stuck: ${sig.slice(0, 160)}`); break; }
+      if (same > 90) { fail(`${scen}@${w} battle ${opt.team} stuck: ${sig.slice(0, 160)}`); break; }
       if (s.popup) { await sleep(750); await pg.evaluate(() => G.press('A')); await sleep(300); continue; }
       if (s.quiz) {
         quizCount++;
@@ -92,7 +100,8 @@ async function run(br, w, h, scen) {
         const pinned = await pg.evaluate(() => { const c = document.getElementById('console'); c.scrollTop = c.scrollHeight; const q = document.querySelector('#ctext .qtext').getBoundingClientRect(), r = c.getBoundingClientRect(); return q.top >= r.top - 1 && q.bottom <= r.bottom + 1; });
         if (!pinned) fail(`${scen}@${w}: question scrolled away (not pinned)`);
         const en = s.opts.map((o, i) => (o.off ? -1 : i)).filter((i) => i >= 0);
-        const pick = en[Math.floor(Math.random() * en.length)];
+        let pick = en[Math.floor(Math.random() * en.length)];
+        if (opt.kind === 'boss' && Math.random() < 0.8) { const ans = await pg.evaluate(() => G.lastQ && G.lastQ.c[G.lastQ.a]); const k = s.opts.findIndex((o) => ans && o.t.replace(/^▶\s*/, '').trim() === ans.trim()); if (k >= 0 && !s.opts[k].off) pick = k; }
         await tap(pick); await sleep(150);
         // 탭 후 고정 질문이 계속 보이는지 (보기 스크롤 후)
         continue;

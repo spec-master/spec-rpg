@@ -459,16 +459,16 @@
   G.gainXP = async function (n, note) {
     P.xp += n; await G.say(t(`경험치 ${n}을(를) 얻었다!`, `Gained ${n} EXP!`) + (note ? "\n" + note : ""));
     while (P.xp >= xpNeed(P.lv)) {
-      P.xp -= xpNeed(P.lv); P.lv++; P.hp = Math.min(maxHP(), P.hp + 6);
+      P.xp -= xpNeed(P.lv); P.lv++; P.hp = maxHP(); /* 레벨 업 = HP 100% 회복 */
       window.LUI && LUI.sfx("levelup"); levelFx();
       const gl = (S.LTSSM.TOWNS || []).find((T) => T.gymLv === P.lv);
-      await G.say(t(`🎉 레벨 업! Lv${P.lv}  (최대 HP ${maxHP()})`, `🎉 Level up! Lv${P.lv}  (max HP ${maxHP()})`) + (P.lv === 10 ? t("\n🏟 Lv10! 핵심 배지를 모으면 LTSSM 관장에게 도전할 수 있다.", "\n🏟 Lv10! Collect the core badges to challenge the LTSSM leader.") : gl ? t(`\n🏟 Lv${P.lv}! ${gl.ko} 관장 도전 레벨 달성.`, `\n🏟 Lv${P.lv}! Level reached for the ${gl.en} leader.`) : ""));
+      await G.say(t(`🎉 레벨 업! Lv${P.lv}  💚 HP 완전 회복! (${P.hp}/${maxHP()})`, `🎉 Level up! Lv${P.lv}  💚 HP fully restored! (${P.hp}/${maxHP()})`) + (P.lv === 10 ? t("\n🏟 Lv10! 핵심 배지를 모으면 LTSSM 관장에게 도전할 수 있다.", "\n🏟 Lv10! Collect the core badges to challenge the LTSSM leader.") : gl ? t(`\n🏟 Lv${P.lv}! ${gl.ko} 관장 도전 레벨 달성.`, `\n🏟 Lv${P.lv}! Level reached for the ${gl.en} leader.`) : ""));
     }
     const blocked = S.MOVES.find((m) => !P.moves.includes(m.id) && P.lv >= m.lv && !moveReqMet(m) && m.req);
     await G.checkGrowth(); await G.checkAch();
     if (blocked && !moveReqMet(blocked) && Math.random() < 0.5) await G.say(t(`💡 「${blocked.name}」: 레벨은 충분! ${moveReqText(blocked)}이 필요하다.`, `💡 ${blocked.name}: level OK! Needs ${moveReqText(blocked)}.`));
   };
-  function levelFx() { const sc = $("screen"); const d = document.createElement("div"); d.className = "lvfx"; d.textContent = "LEVEL UP!"; sc.appendChild(d); setTimeout(() => d.remove(), 1400); }
+  function levelFx() { const sc = $("screen"); const d = document.createElement("div"); d.className = "lvfx"; d.innerHTML = "LEVEL UP!<small>HP 100%</small>"; sc.appendChild(d); setTimeout(() => d.remove(), 1400); }
   G.giveItem = async function (id, n = 1, silent) { P.items[id] = (P.items[id] || 0) + n; if (!silent) await G.say(t(`🎒 「${IN(S.ITEMS[id])}」 ×${n}을(를) 받았다!`, `🎒 Got ${IN(S.ITEMS[id])} ×${n}!`) + `\n${ID(S.ITEMS[id])}`); };
   G.heal = () => { P.hp = maxHP(); };
   G.addBadge = (b) => { if (!P.badges.includes(b)) P.badges.push(b); };
