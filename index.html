@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3.1">
 </head>
 <body>
 <div id="app">
@@ -24,6 +24,7 @@
     <div id="console" class="box">
       <div id="cname"></div>
       <div id="ctext"></div>
+      <div id="csub"></div>
       <div id="clist"></div>
       <div id="carrow">▼</div>
     </div>
@@ -45,19 +46,22 @@
     </div>
   </div>
 </div>
-<script src="js/data.js"></script>
-<script src="js/ltssm_q1.js"></script>
-<script src="js/ltssm_q2.js"></script>
-<script src="js/ltssm_q3.js"></script>
-<script src="js/ltssm.js"></script>
-<script src="js/ltssm_ui.js"></script>
-<script src="js/savecode.js"></script>
-<script src="js/engine.js"></script>
-<script src="js/online.js"></script>
-<script src="js/story.js"></script>
+<script src="js/data.js?v=3.1"></script>
+<script src="js/ltssm_q1.js?v=3.1"></script>
+<script src="js/ltssm_q2.js?v=3.1"></script>
+<script src="js/ltssm_q3.js?v=3.1"></script>
+<script src="js/ltssm.js?v=3.1"></script>
+<script src="js/ltssm_ui.js?v=3.1"></script>
+<script src="js/savecode.js?v=3.1"></script>
+<script src="js/engine.js?v=3.1"></script>
+<script src="js/online.js?v=3.1"></script>
+<script src="js/story.js?v=3.1"></script>
 <script>
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  navigator.serviceWorker.register('sw.js').catch(function(){});
+  var hadCtl = !!navigator.serviceWorker.controller, reloaded = false;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (r) { r.update && r.update(); }).catch(function(){});
+  // 새 SW가 제어를 넘겨받으면(업데이트) 한 번만 새로고침 → iPhone에서 옛 JS가 남지 않게
+  navigator.serviceWorker.addEventListener('controllerchange', function () { if (hadCtl && !reloaded && !(window.G && G.mode === 'battle')) { reloaded = true; location.reload(); } });
 }
 </script>
 </body>

@@ -8,7 +8,7 @@
   const cv = document.getElementById("cv");
   const ctx = cv.getContext("2d");
   const $ = (id) => document.getElementById(id);
-  const elText = $("ctext"), elList = $("clist"), elName = $("cname"), elArrow = $("carrow"), elConsole = $("console");
+  const elText = $("ctext"), elSub = $("csub"), elList = $("clist"), elName = $("cname"), elArrow = $("carrow"), elConsole = $("console");
   const elPanel = $("panel"), elPTitle = $("ptitle"), elPList = $("plist");
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const rnd = (n) => Math.floor(Math.random() * n);
@@ -110,9 +110,21 @@
   const SAVE_KEY = "specrpg_save_v1";
   function newState() {
     return { map: "lab", x: 4, y: 6, dir: "up", lv: 1, xp: 0, hp: 30, chapter: 1, ltssm: "Detect", gen: 1, width: 1,
-      flags: {}, items: {}, learned: {}, mastery: {}, moves: [], badges: [], seenQ: {}, wins: 0, playMs: 0,
+      flags: {}, items: {}, learned: {}, mastery: {}, moves: ["rxdetect"], badges: [], seenQ: {}, wins: 0, playMs: 0,
       ver: 2, sbadges: [], rules: {}, ach: [], met: [], st: { cs: 0, bs: 0, pf: 0 }, title: "" };
   }
+  /* 기본 기술 보장: 기술이 0개면 전투에서 '기술' 목록이 비어 아무것도 안 뜨던 버그(v3) 방지 */
+  const BASE_MOVE = "rxdetect";
+  function sanitize() {
+    if (!P) return;
+    ["flags", "items", "learned", "mastery", "seenQ", "rules"].forEach((k) => { if (!P[k] || typeof P[k] !== "object" || Array.isArray(P[k])) P[k] = {}; });
+    ["moves", "badges", "sbadges", "ach", "met"].forEach((k) => { if (!Array.isArray(P[k])) P[k] = []; });
+    P.moves = P.moves.filter((m, i, a) => S.MOVES.some((x) => x.id === m) && a.indexOf(m) === i);
+    if (!P.moves.includes(BASE_MOVE)) P.moves.unshift(BASE_MOVE);
+    P.st = Object.assign({ cs: 0, bs: 0, pf: 0 }, P.st);
+    if (!(P.lv >= 1)) P.lv = 1; if (!(P.hp >= 0)) P.hp = maxHP(); P.hp = Math.min(P.hp, maxHP());
+  }
+  G.sanitize = () => sanitize();
   G.P = () => P;
   const maxHP = () => 30 + 6 * (P.lv - 1);
   const xpNeed = (lv) => 10 + lv * 10;
@@ -122,10 +134,10 @@
   G.hasItem = (k) => (P.items[k] || 0) > 0;
   G.save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); } catch (e) {} };
   G.hasSave = () => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };
-  G.load = () => { try { let s = JSON.parse(localStorage.getItem(SAVE_KEY)); const r = S.LTSSM.migrate(s); s = r.P; P = Object.assign(newState(), s); P.st = Object.assign({ cs: 0, bs: 0, pf: 0 }, P.st); G.justMigrated = r.migrated; return true; } catch (e) { return false; } };
-  G.newGame = () => { P = newState(); };
+  G.load = () => { try { let s = JSON.parse(localStorage.getItem(SAVE_KEY)); const r = S.LTSSM.migrate(s); s = r.P; P = Object.assign(newState(), s); sanitize(); if (!G.maps[P.map]) { P.map = "town"; P.x = 9; P.y = 13; } G.justMigrated = r.migrated; return true; } catch (e) { console.warn("load failed", e); P = newState(); return false; } };
+  G.newGame = () => { P = newState(); sanitize(); };
   G.newState = newState;
-  G.setState = (s) => { P = Object.assign(newState(), s); P.st = Object.assign({ cs: 0, bs: 0, pf: 0 }, P.st); P.hp = Math.min(P.hp, maxHP()); mv = null; };
+  G.setState = (s) => { P = Object.assign(newState(), s); sanitize(); if (!G.maps[P.map]) { P.map = "town"; P.x = 9; P.y = 13; } mv = null; };
   G.setHandler = (h) => { handler = h; };
 
   /* ---------------- 입력 ---------------- */
@@ -148,27 +160,30 @@
     el.addEventListener("pointerdown", down); el.addEventListener("pointerup", up); el.addEventListener("pointerleave", up); el.addEventListener("pointercancel", up);
     el.addEventListener("contextmenu", (e) => e.preventDefault());
   });
-  elConsole.addEventListener("pointerdown", (e) => { if (e.target.closest(".opt, input, textarea, button, a, .nogo")) return; if (handler) press("A"); });
+  // 콘솔 탭 = 대사 넘기기 (대사 중일 때만; 선택지/퀴즈 중 탭·스크롤로 답이 골라지던 문제 방지). click이라 스크롤 드래그엔 반응 안 함.
+  let sayActive = false;
+  elConsole.addEventListener("click", (e) => { if (e.target.closest(".opt, input, textarea, button, a, .nogo")) return; if (handler && sayActive) press("A"); });
   document.addEventListener("gesturestart", (e) => e.preventDefault());
   const heldDir = () => (lastDir && held[lastDir] ? lastDir : ["up", "down", "left", "right"].find((d) => held[d]) || null);
 
   /* ---------------- 대화 / 선택 UI ---------------- */
-  function clearConsole() { elText.textContent = ""; elList.innerHTML = ""; elList.className = ""; elName.textContent = ""; elArrow.classList.remove("on"); elConsole.style.fontSize = ""; elConsole.scrollTop = 0; }
-  /* fitConsole: 내용이 넘치면 글자 크기를 단계적으로 줄여 스크롤 없이 보이게 (최소 11px) */
-  function fitConsole() {
-    elConsole.style.fontSize = ""; elConsole.scrollTop = 0;
-    let fs = parseFloat(getComputedStyle(elConsole).fontSize) || 15;
-    while (elConsole.scrollHeight > elConsole.clientHeight + 1 && fs > 11) { fs -= 0.5; elConsole.style.fontSize = fs + "px"; }
-    elConsole.scrollTop = 0;
+  function setQuiz(on) { elConsole.classList.toggle("quiz", !!on); }
+  function clearConsole() { elText.textContent = ""; elSub.innerHTML = ""; elList.innerHTML = ""; elList.className = ""; elName.textContent = ""; elArrow.classList.remove("on"); setQuiz(false); elConsole.scrollTop = 0; }
+  /* v3.1: 글자 축소(fitConsole) 제거. 퀴즈는 질문(#ctext)을 sticky로 고정하고 보기만 스크롤. */
+  function ensureVisible(el) {
+    if (!el) return; const r = el.getBoundingClientRect(), c = elConsole.getBoundingClientRect();
+    const top = c.top + (elConsole.classList.contains("quiz") ? elText.offsetHeight : 0);
+    if (r.top < top) elConsole.scrollTop -= top - r.top + 4; else if (r.bottom > c.bottom) elConsole.scrollTop += r.bottom - c.bottom + 4;
   }
-  G.fitConsole = fitConsole;
+  G.fitConsole = () => {};
   G.clearConsole = clearConsole;
   function typeLine(text) {
     return new Promise((resolve) => {
-      let i = 0, done = false; elText.textContent = ""; elArrow.classList.remove("on"); elConsole.style.fontSize = ""; elConsole.scrollTop = 0;
+      let i = 0, done = false; text = String(text == null ? "" : text); setQuiz(false); elSub.innerHTML = ""; elText.textContent = ""; elArrow.classList.remove("on"); elConsole.scrollTop = 0;
       const timer = setInterval(() => { i += 2; elText.textContent = text.slice(0, i); elConsole.scrollTop = elConsole.scrollHeight; if (i >= text.length) finish(); }, 28);
-      function finish() { clearInterval(timer); elText.textContent = text; done = true; elArrow.classList.add("on"); if (G.mode === "battle") { fitConsole(); elConsole.scrollTop = elConsole.scrollHeight; } }
-      handler = (b) => { if (b !== "A" && b !== "B") return; if (!done) finish(); else { handler = null; elArrow.classList.remove("on"); resolve(); } };
+      function finish() { clearInterval(timer); elText.textContent = text; done = true; elArrow.classList.add("on"); elConsole.scrollTop = elConsole.scrollHeight; }
+      sayActive = true;
+      handler = (b) => { if (b !== "A" && b !== "B") return; if (!done) finish(); else { handler = null; sayActive = false; elArrow.classList.remove("on"); resolve(); } };
     });
   }
   G.say = async function (lines, name) {
@@ -179,31 +194,36 @@
   /* choose: 목록 선택. opts: {prompt, cancel, grid, disabled:Set, hint:(i)=>text, header} → index (-1 = 취소) */
   G.choose = function (options, opts = {}) {
     return new Promise((resolve) => {
-      elName.textContent = opts.name || ""; elConsole.style.fontSize = ""; elConsole.scrollTop = 0;
+      options = (options || []).map((o) => String(o == null ? "" : o));
+      elName.textContent = opts.name || ""; setQuiz(opts.quiz); elConsole.scrollTop = 0; elSub.innerHTML = "";
       elText.innerHTML = ""; if (opts.header) { const h = document.createElement("div"); h.className = "hdr"; h.textContent = opts.header; elText.appendChild(h); }
       if (opts.prompt) { const q = document.createElement("div"); q.className = opts.quiz ? "qtext" : ""; q.textContent = opts.prompt; elText.appendChild(q); }
-      if (opts.sub) { const h = document.createElement("div"); h.className = "qsub"; h.innerHTML = opts.sub; elText.appendChild(h); }
+      if (opts.sub) { const h = document.createElement("div"); h.className = "qsub"; h.innerHTML = opts.sub; (opts.quiz ? elSub : elText).appendChild(h); }
       elArrow.classList.remove("on"); elList.innerHTML = ""; elList.className = (opts.grid ? "grid" : "") + (opts.quiz ? " quiz" : "");
       const dis = opts.disabled || new Set(); let cur = 0; while (dis.has(cur) && cur < options.length - 1) cur++;
       const els = options.map((o, i) => { const d = document.createElement("div"); d.className = "opt" + (dis.has(i) ? " off" : ""); d.textContent = o;
-        d.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); if (dis.has(i)) return; cur = i; render(); finish(i); }); elList.appendChild(d); return d; });
-      const hintEl = document.createElement("div"); hintEl.className = "hdr"; hintEl.style.marginTop = "4px"; if (opts.hint) elList.after ? null : null;
+        d.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (dis.has(i) || finished || handler !== myHandler) return; cur = i; render(); finish(i); }); elList.appendChild(d); return d; });
+      const hintEl = document.createElement("div"); hintEl.className = "hdr hint"; hintEl.style.marginTop = "4px";
       let first = true;
       function render() {
-        els.forEach((e, i) => e.classList.toggle("sel", i === cur)); if (opts.hint) { hintEl.textContent = opts.hint(cur) || ""; elList.appendChild(hintEl); }
-        // 버그 수정: 첫 렌더에서 scrollIntoView 금지(질문이 위로 밀려 안 보이던 원인). 퀴즈는 항상 맨 위 고정.
-        if (opts.quiz || G.mode === "battle") { if (first) fitConsole(); elConsole.scrollTop = 0; }
-        else if (!first && els[cur]) { const r = els[cur].getBoundingClientRect(), c = elConsole.getBoundingClientRect(); if (r.bottom > c.bottom || r.top < c.top) els[cur].scrollIntoView({ block: "nearest" }); }
+        els.forEach((e, i) => e.classList.toggle("sel", i === cur)); if (opts.hint) { hintEl.textContent = (els.length && opts.hint(cur)) || ""; elList.appendChild(hintEl); }
+        // 첫 렌더는 항상 맨 위(질문 보이게). 이후 이동 시 선택 보기만 보이도록 스크롤(고정된 질문 아래로).
+        if (first) elConsole.scrollTop = 0; else ensureVisible(els[cur]);
         first = false;
       }
-      function finish(i) { handler = null; resolve(i); }
+      let finished = false;
+      function finish(i) { if (finished) return; finished = true; handler = null; resolve(i); }
+      if (!els.length) { // 선택지가 없으면 안내 후 A/B로 취소(-1) — 빈 화면에서 멈추지 않도록
+        const d = document.createElement("div"); d.className = "hdr"; d.textContent = opts.empty || "(선택할 항목이 없다 — A/B: 돌아가기)"; elList.appendChild(d);
+        handler = (b) => { if (b === "A" || b === "B") finish(-1); }; return;
+      }
       render();
-      handler = (b) => {
+      const myHandler = (handler = (b) => {
         const step = opts.grid ? { up: -2, down: 2, left: -1, right: 1 }[b] : { up: -1, down: 1 }[b];
         if (step) { let n = cur; for (let k = 0; k < options.length; k++) { n = (n + step + options.length) % options.length; if (!dis.has(n)) break; } cur = n; render(); }
         else if (b === "A") finish(cur);
         else if (b === "B" && opts.cancel) finish(-1);
-      };
+      });
     });
   };
   G.markChoices = (okIdx, ngIdx) => { const els = elList.querySelectorAll(".opt"); if (els[okIdx]) els[okIdx].classList.add("ok"); if (ngIdx != null && ngIdx !== okIdx && els[ngIdx]) els[ngIdx].classList.add("ng"); };
@@ -218,7 +238,7 @@
         if (it.icon) { const im = document.createElement("img"); im.src = it.icon; im.className = "ico"; d.appendChild(im); }
         const sp = document.createElement("span"); sp.className = "lb"; sp.textContent = it.label; d.appendChild(sp);
         if (it.bar != null) { const b = document.createElement("div"); b.className = "bar"; const f = document.createElement("i"); f.style.width = Math.round(Math.max(0, Math.min(1, it.bar)) * 100) + "%"; b.appendChild(f); d.appendChild(b); }
-        if (!it.sec) d.addEventListener("pointerdown", (e) => { e.preventDefault(); const k = selectable.indexOf(i); if (k === cur && opts.selectable) { done(i); return; } cur = k; render(); }); elPList.appendChild(d); return d; });
+        if (!it.sec) d.addEventListener("click", (e) => { e.preventDefault(); const k = selectable.indexOf(i); if (k === cur && opts.selectable) { done(i); return; } cur = k; render(); }); elPList.appendChild(d); return d; });
       function render() { els.forEach((e) => e.classList.remove("sel")); const i = selectable[cur]; if (i == null) { clearConsole(); elText.textContent = opts.empty || ""; return; } els[i].classList.add("sel"); els[i].scrollIntoView({ block: "nearest" }); clearConsole(); elText.textContent = items[i].desc || ""; elArrow.classList.remove("on"); }
       function done(i) { handler = null; elPanel.classList.add("hidden"); clearConsole(); resolve(i); }
       render();
@@ -349,7 +369,6 @@
     for (let i = 0; i < 16; i++) { ctx.fillStyle = i % 2 ? "#2c4a2c" : "#244024"; ctx.fillRect(0, 100 + ((i * 7 + animT / 2) % 44), 160, 1); }
     text("SPEC 몬스터", 30, 40, 16, "#f0c040"); text("골드 · PCIe/CXL 편", 40, 56, 9, "#f8f8e8");
     ctx.drawImage(monSprite("ltssmdrake"), 60, 64);
-    text("by teslanius", 58, 136, 6, "#88a070", false);
   }
   let lastT = performance.now();
   function frame() {
@@ -476,6 +495,7 @@
     const maxD = opt.maxD || levelMaxD(), minD = Math.min(opt.minD || 1, maxD);
     let fams = m && m.fam ? [m.fam] : opt.fams || LT.CORE;
     let base = [].concat(...fams.map((f) => LT.LQ_BY_FAM[f] || []));
+    if (!base.length) base = LT.LQ.slice(); // 빈 풀 방지
     let pool = base.filter((q) => q.d >= minD && q.d <= maxD && !recent.includes(q.id));
     if (pool.length < 3) pool = base.filter((q) => q.d <= Math.max(maxD, 2) && !recent.includes(q.id));
     if (!pool.length) pool = base.filter((q) => !recent.includes(q.id));
@@ -486,12 +506,21 @@
     for (let i = 0; i < pool.length; i++) { r -= wts[i]; if (r <= 0) { q = pool[i]; break; } }
     recent.push(q.id); if (recent.length > 15) recent.shift(); return q;
   }
+  const validQ = (q) => q && typeof q.q === "string" && q.q && Array.isArray(q.c) && q.c.length === 4 && q.a >= 0 && q.a < 4;
   function pickQuestion(opt, m) {
-    if ((m && m.ltssm) || opt.fams) return pickLQ(opt, m);
+    opt = opt || {};
+    let q = null;
+    try { q = pickQuestion0(opt, m); } catch (e) { console.error("pickQuestion", e); }
+    if (!validQ(q)) { const all = LT.LQ.filter(validQ); q = all[rnd(all.length)]; } // 어떤 경우에도 문제는 나온다
+    return q;
+  }
+  function pickQuestion0(opt, m) {
+    if ((m && m.ltssm) || opt.fams || !Array.isArray(opt.chapters) || !opt.chapters.length) return pickLQ(opt, m);
     const maxD = opt.maxD || levelMaxD(), minD = Math.min(opt.minD || 1, maxD);
     let pool = S.QUESTIONS.filter((q) => opt.chapters.includes(q.ch) && q.d >= minD && q.d <= maxD && !recent.includes(q.id));
     if (!pool.length) pool = S.QUESTIONS.filter((q) => opt.chapters.includes(q.ch) && !recent.includes(q.id));
     if (!pool.length) pool = S.QUESTIONS.filter((q) => opt.chapters.includes(q.ch));
+    if (!pool.length) return pickLQ(opt, m);
     const weighted = []; pool.forEach((q) => { const s = P.seenQ[q.id]; const w = !s ? 4 : (s.st || 0) === 0 && s.n > s.ok ? 5 : s.ok >= 2 ? 1 : 2; for (let i = 0; i < w; i++) weighted.push(q); });
     const q = weighted[rnd(weighted.length)]; recent.push(q.id); if (recent.length > 12) recent.shift(); return q;
   }
@@ -499,8 +528,20 @@
 
   /* ---------------- 전투 ---------------- */
   // opt: { kind: 'wild'|'trainer'|'boss', team:[monId], chapters:[ch], fams:[state], trainer:'이름', minD, maxD, xp, onStart }
+  /* 전투 중 예외가 나도 전투 모드에 갇히지 않도록 래핑 */
   G.battle = async function (opt) {
-    const prevMode = G.mode; await flash(3); G.mode = "battle"; document.body.classList.add("battle");
+    opt = Object.assign({ kind: "wild", team: [] }, opt); opt.team = (opt.team || []).filter((id) => S.MONSTERS[id]);
+    if (!opt.team.length) { console.error("battle: empty team"); return "run"; }
+    sanitize();
+    const prevMode = G.mode === "battle" ? "field" : G.mode;
+    try { return await battle0(opt, prevMode); }
+    catch (e) {
+      console.error("battle error", e); handler = null; document.body.classList.remove("battle"); clearConsole();
+      B = null; fadeA = 0; G.mode = prevMode === "title" ? "field" : prevMode; G.save(); return "run";
+    }
+  };
+  async function battle0(opt, prevMode) {
+    await flash(3); G.mode = "battle"; document.body.classList.add("battle");
     B = { enemy: null, ehp: 0, emax: 0, eShake: 0, pShake: 0, eBlink: 0, eSlide: 60, eVisible: true, replay: false, wrong: 0, combo: 0, dmgTaken: 0,
       title: opt.kind === "boss" ? "★ 관장전 ★" : opt.kind === "trainer" ? "트레이너 배틀" : "" };
     let result = "win";
@@ -516,9 +557,10 @@
         const acts = ["기술", "가방", "도망"];
         const a = await G.choose(acts, { prompt: `${m.name}  HP ${B.ehp}/${B.emax}${P.st.cs >= 2 ? `   🔥${P.st.cs} 콤보` : ""}\n무엇을 할까?`, grid: true });
         if (a === 0) {
-          const ms = P.moves.map((x) => S.MOVES.find((y) => y.id === x)).filter(Boolean);
+          let ms = P.moves.map((x) => S.MOVES.find((y) => y.id === x)).filter(Boolean);
+          if (!ms.length) { sanitize(); ms = P.moves.map((x) => S.MOVES.find((y) => y.id === x)).filter(Boolean); }
           const k = await G.choose(ms.map((x) => x.name), { prompt: "어떤 기술을 쓸까?", cancel: true, grid: ms.length > 3, hint: (i) => ms[i] && ms[i].desc });
-          if (k < 0) continue;
+          if (k < 0 || !ms[k]) continue;
           await quizTurn(ms[k], opt, B.enemy);
         } else if (a === 1) {
           const used = await battleBag(); if (!used) continue;
@@ -545,10 +587,10 @@
       return "lose";
     }
     if (result === "win") { P.wins++; if (opt.kind === "boss" && B.dmgTaken === 0) P.flags.gym_nodmg_pending = true; }
-    await G.fade(1); B = null; G.mode = prevMode === "battle" ? "field" : prevMode; await G.fade(0);
+    await G.fade(1); B = null; G.mode = prevMode; await G.fade(0);
     await G.checkAch();
     G.save(); return result;
-  };
+  }
   async function battleBag() {
     const ids = Object.keys(P.items).filter((k) => P.items[k] > 0 && S.ITEMS[k].kind !== "key");
     if (!ids.length) { await G.say("쓸 수 있는 아이템이 없다."); return false; }
@@ -566,6 +608,7 @@
   G.useItem = useItem;
   const qStatHTML = (s) => !s ? `<span class="tag new">NEW</span>` : `<span class="tag ok">✓${s.ok}</span><span class="tag ng">✗${s.n - s.ok}</span>${(s.st || 0) >= 3 ? `<span class="tag ms">👑 마스터</span>` : (s.st || 0) > 0 ? `<span class="tag st">연속 ${s.st}</span>` : ""}`;
   async function quizTurn(move, opt, m) {
+    move = move || S.MOVES.find((x) => x.id === BASE_MOVE);
     const q = pickQuestion(opt, m);
     const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
     const labels = order.map((i) => q.c[i]); const correct = order.indexOf(q.a);
@@ -573,7 +616,8 @@
     if (move.effect === "elim") dis.add(wrong[0]); if (move.effect === "elim2") { dis.add(wrong[0]); dis.add(wrong[1]); }
     let replay = move.effect === "replay" || B.replay; B.replay = false;
     const stars = "★".repeat(q.d) + "☆".repeat(3 - q.d);
-    const topic = q.rule ? `${stateOf(q.fam).name}${stateOf(q.fam).tag ? " · " + stateOf(q.fam).tag : ""}` : S.CONCEPTS[q.concept].name;
+    const fs = q.rule && stateOf(q.fam), cc = q.concept && S.CONCEPTS[q.concept];
+    const topic = fs ? `${fs.name}${fs.tag ? " · " + fs.tag : ""}` : cc ? cc.name : "spec";
     const header = `[${move.name}] ${topic} · ${stars}`;
     const s0 = P.seenQ[q.id];
     const ruleTag = q.rule ? ` <span class="tag rl">규칙 ${Math.min(ruleN(q.rule), LT.RULE_NEED)}/${LT.RULE_NEED}${ruleOK(q.rule) ? " ✔" : ""}</span>` : "";

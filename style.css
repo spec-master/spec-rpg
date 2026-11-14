@@ -58,7 +58,6 @@ input.fld { font: 16px -apple-system, sans-serif; }
 /* ===== v3: 동적 높이 / 안전영역 ===== */
 html, body { height: 100%; height: 100dvh; }
 #app { height: 100%; height: 100dvh; padding-left: max(6px, env(safe-area-inset-left)); padding-right: max(6px, env(safe-area-inset-right)); }
-#screen { max-height: 52vh; max-height: 52dvh; margin: 0 auto; }
 #cv { object-fit: contain; }
 #clist .opt { touch-action: manipulation; }
 .qtext { font-weight: 600; }
@@ -68,29 +67,13 @@ html, body { height: 100%; height: 100dvh; }
 .tag.ok { background: #d6f5d0; color: #1f6a1f; } .tag.ng { background: #fadcdc; color: #8a2020; }
 .tag.ms { background: #fff0b0; color: #8a6000; } .tag.st { background: #e0ecff; color: #203a8a; } .tag.rl { background: #efe3ff; color: #50308a; }
 
-/* ===== 전투: 질문 + 4지선다가 스크롤 없이 보이도록 ===== */
-body.battle #screen { aspect-ratio: auto; height: 30vh; height: 30dvh; max-height: 260px; min-height: 150px; background: #f8f8e8; }
-body.battle #console { margin-top: 4px; padding: 6px 9px 6px; min-height: 0; line-height: 1.35; font-size: 15px; }
-body.battle #clist .opt { padding: 6px 7px 6px 20px; margin: 3px 0; font-size: 1em; line-height: 1.25; }
-body.battle #clist .opt.sel::before { top: 7px; }
-body.battle #clist.grid { gap: 0 5px; }
-body.battle #clist.grid .opt { margin: 2px 0; }
-body.battle .hdr { font-size: 0.78em; margin-bottom: 1px; }
-body.battle #controls { height: 128px; padding: 2px 4px 4px; }
-body.battle #dpad { grid-template-columns: 40px 40px 40px; grid-template-rows: 40px 40px 40px; }
-body.battle .btn { width: 52px; height: 52px; font-size: 17px; }
-body.battle #ab { width: 120px; height: 100px; }
-body.battle .btn.b { top: 40px; }
-body.battle #mid { margin-bottom: 6px; }
-@media (max-height: 700px) {
-  #controls { height: 160px; }
-  #dpad { grid-template-columns: 46px 46px 46px; grid-template-rows: 46px 46px 46px; }
-  body.battle #screen { height: 27vh; height: 27dvh; min-height: 130px; }
-  body.battle #controls { height: 112px; }
-  body.battle #dpad { grid-template-columns: 35px 35px 35px; grid-template-rows: 35px 35px 35px; }
-  body.battle .btn { width: 46px; height: 46px; }
-  body.battle #ab { height: 92px; } body.battle .btn.b { top: 38px; }
-}
+/* ===== 퀴즈: 원래 비율 유지, 질문만 콘솔 상단에 고정(sticky) · 보기는 아래에서 스크롤 ===== */
+#console.quiz { padding-top: 0; }
+#console.quiz #ctext { position: sticky; top: 0; z-index: 2; background: #f8f8e8; padding: 8px 0 5px; margin: 0 -4px; padding-left: 4px; padding-right: 4px;
+  border-bottom: 2px solid #c8d8b0; box-shadow: 0 3px 4px -3px rgba(32, 56, 32, .35); }
+#console.quiz #csub { margin-top: 4px; }
+#csub:empty { display: none; }
+#clist .opt { scroll-margin-bottom: 6px; }
 
 /* ===== 패널: 아이콘 / 진행 바 / 배지 케이스 그리드 ===== */
 #plist .it { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

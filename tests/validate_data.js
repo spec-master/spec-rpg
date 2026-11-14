@@ -1,0 +1,32 @@
+// 데이터 무결성 검사: node tests/validate_data.js
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const root = path.join(__dirname, '..');
+const ctx = { window: {}, console }; ctx.window = ctx; vm.createContext(ctx);
+['data.js', 'ltssm_q1.js', 'ltssm_q2.js', 'ltssm_q3.js', 'ltssm.js'].forEach((f) => vm.runInContext(fs.readFileSync(path.join(root, 'js', f), 'utf8'), ctx, { filename: f }));
+const S = ctx.SPEC, LT = S.LTSSM, err = [];
+const stIds = new Set(LT.STATES.map((s) => s.id));
+const chk = (q, src) => {
+  if (!q.id) err.push(src + ': no id');
+  if (!q.q || typeof q.q !== 'string') err.push(q.id + ': empty question');
+  if (!Array.isArray(q.c) || q.c.length !== 4 || q.c.some((c) => !c || typeof c !== 'string')) err.push(q.id + ': choices != 4');
+  else if (new Set(q.c).size !== 4) err.push(q.id + ': duplicate choices');
+  if (!(q.a >= 0 && q.a <= 3)) err.push(q.id + ': bad answer idx');
+  if (![1, 2, 3].includes(q.d)) err.push(q.id + ': bad difficulty ' + q.d);
+  if (!q.e) err.push(q.id + ': no explanation');
+};
+const ids = new Set();
+LT.LQ.forEach((q) => { chk(q, 'LQ'); if (ids.has(q.id)) err.push('dup id ' + q.id); ids.add(q.id);
+  if (!stIds.has(q.fam)) err.push(q.id + ': unknown fam ' + q.fam); if (!LT.RULES[q.rule]) err.push(q.id + ': unknown rule ' + q.rule);
+  if (q.concept && !S.CONCEPTS[q.concept]) err.push(q.id + ': unknown concept ' + q.concept); });
+S.QUESTIONS.forEach((q) => { chk(q, 'Q'); if (ids.has(q.id)) err.push('dup id ' + q.id); ids.add(q.id); if (!q.rule && !S.CONCEPTS[q.concept]) err.push(q.id + ': unknown concept ' + q.concept); });
+Object.keys(LT.RULES).forEach((r) => { if (!LT.LQ.some((q) => q.rule === r)) err.push('rule without question ' + r); });
+LT.STATES.forEach((s) => { for (const d of [1, 2, 3]) if (!(LT.LQ_BY_FAM[s.id] || []).some((q) => q.d <= d)) err.push(`state ${s.id} has no question with d<=${d}`); });
+LT.LMON.forEach((m) => { if (!(m.boss && m.fam == null) && !stIds.has(m.fam)) err.push('mon ' + m.id + ' bad fam'); (m.rules || []).forEach((r) => { if (!LT.RULES[r]) err.push('mon ' + m.id + ' bad rule ' + r); }); });
+S.MOVES.forEach((m) => { if (m.req && !stIds.has(m.req.s)) err.push('move ' + m.id + ' bad req'); if (m.req && m.req.n > Object.keys(LT.STATES.find((s) => s.id === m.req.s).rules).length) err.push('move ' + m.id + ' req too high');
+  if (m.concept && !S.CONCEPTS[m.concept]) err.push('move ' + m.id + ' bad concept'); });
+LT.ACH.forEach((a) => { if (!a.id || !a.title) err.push('ach bad ' + a.id); });
+const byFam = {}; LT.LQ.forEach((q) => (byFam[q.fam] = (byFam[q.fam] || 0) + 1));
+console.log(`LQ ${LT.LQ.length}, legacy Q ${S.QUESTIONS.length}, rules ${Object.keys(LT.RULES).length}, states ${LT.STATES.length}, mons ${LT.LMON.length}, moves ${S.MOVES.length}`);
+console.log('per fam', JSON.stringify(byFam));
+if (err.length) { console.log('ERRORS\n' + err.join('\n')); process.exit(1); } else console.log('DATA OK');
+module.exports = S;
