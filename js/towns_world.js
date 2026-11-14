@@ -66,9 +66,9 @@
         intro: [`${F[0][1]}이라면 자신 있지! 덤벼!`, `I know my ${F[0][2]}! Bring it!`], win: ["크윽… 규칙을 더 외워야겠어.", "Ugh… I need to study the rules more."], after: [F[0][9 - 1] || "", F[0][9] || ""] })]
     };
     // ----- 허브 -----
-    const roof = ["U", "O", "R", "P"][n % 4], hubTh = THEME[T.field[0]];
+    const roof = ["U", "O", "R", "P"][n % 4], roof2 = ["P", "R", "U", "O"][(n + 1) % 4], hubTh = THEME[T.field[0]];
     G.maps[id] = { town: n, name: T.ko, en: T.en, tint: T.tint, hub: true,
-      tiles: area(20, 14, hubTh[0], hubTh[1], [["=", 9, 0, 2, 14], ["=", 0, 7, 20, 1], ["P", 2, 2, 5, 2], ["H", 2, 4, 5, 1], ["D", 4, 4, 1, 1], [roof, 13, 2, 5, 2], ["H", 13, 4, 5, 1], ["C", 15, 4, 1, 1],
+      tiles: area(20, 14, hubTh[0], hubTh[1], [["=", 9, 0, 2, 14], ["=", 0, 7, 20, 1], [roof2, 2, 2, 5, 2], ["H", 2, 4, 5, 1], ["D", 4, 4, 1, 1], [roof, 13, 2, 5, 2], ["H", 13, 4, 5, 1], ["C", 15, 4, 1, 1],
         ["=", 4, 5, 1, 2], ["S", 7, 5, 1, 1], ["=", 15, 5, 1, 2]].concat(HUBDECO[n % HUBDECO.length])),
       warps: [{ x: 9, y: 13, to: id + "_route", tx: 6, ty: 1, dir: "down" }, { x: 10, y: 13, to: id + "_route", tx: 7, ty: 1, dir: "down" },
         { x: 0, y: 7, to: id + "_f2", tx: 22, ty: 7, dir: "left" }, { x: 19, y: 7, to: id + "_f3", tx: 1, ty: 7, dir: "right" }, { x: 4, y: 4, to: id + "_gym", tx: 4, ty: 10, dir: "up" },
@@ -164,7 +164,7 @@
   /* ----- 월드맵 ----- */
   const WPOS = [[30, 160], [80, 172], [130, 150], [110, 108], [60, 92], [40, 50], [95, 30], [150, 52], [200, 34], [250, 58], [280, 18]]; // 1..10 + 챔피언
   function worldImage() {
-    const W = 300, H = 190, c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
+    const W = 300, H = 190, c = document.createElement("canvas"); c.width = W * 2; c.height = H * 2; const g = c.getContext("2d"); g.scale(2, 2);
     g.fillStyle = "#7cc0e8"; g.fillRect(0, 0, W, H);
     g.fillStyle = "#8bd060"; g.beginPath(); g.ellipse(150, 100, 148, 88, 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = "#6fb048"; [[60, 140, 30], [200, 90, 40], [120, 60, 24], [250, 140, 26]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); });

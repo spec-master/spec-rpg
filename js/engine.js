@@ -255,6 +255,7 @@
       elPList.className = opts.cols ? "cols c" + opts.cols : "";
       const els = items.map((it, i) => { const d = document.createElement("div"); d.className = "it" + (it.sec ? " sec" : "") + (it.lock ? " lock" : "") + (it.cls ? " " + it.cls : "");
         if (it.icon) { const im = document.createElement("img"); im.src = it.icon; im.className = "ico"; d.appendChild(im); }
+        if (it.img) { const im = document.createElement("img"); im.src = it.img; im.className = "pimg"; d.appendChild(im); }
         const sp = document.createElement("span"); sp.className = "lb"; sp.textContent = it.label; d.appendChild(sp);
         if (it.bar != null) { const b = document.createElement("div"); b.className = "bar"; const f = document.createElement("i"); f.style.width = Math.round(Math.max(0, Math.min(1, it.bar)) * 100) + "%"; b.appendChild(f); d.appendChild(b); }
         if (!it.sec) d.addEventListener("click", (e) => { e.preventDefault(); const k = selectable.indexOf(i); if (k === cur && opts.selectable) { done(i); return; } cur = k; render(); }); elPList.appendChild(d); return d; });
