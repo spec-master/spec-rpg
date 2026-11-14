@@ -8,6 +8,7 @@
   const SPEC = typeof window !== "undefined" ? window.SPEC : require("./data.js");
   const Q = typeof window !== "undefined" ? [].concat(window.LTSSM_Q1, window.LTSSM_Q2, window.LTSSM_Q3)
     : [].concat(require("./ltssm_q1.js"), require("./ltssm_q2.js"), require("./ltssm_q3.js"));
+  const QEN = typeof window !== "undefined" ? window.LTSSM_Q_EN || [] : require("./ltssm_q_en.js"); // 영어판(같은 순서)
   const RULE_NEED = 2;
 
   /* core: 관장 도전에 필요한 핵심 배지 */
@@ -98,6 +99,7 @@
   // 문제 id = 규칙 + 질문 문장 해시 (문제를 추가·재배치해도 저장 기록이 유지됨)
   const h32 = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
   const LQ = Q.map(([fam, rule, d, q, a, b, c, e2, ex, idq]) => ({ id: "L" + rule + "_" + h32(idq || q), /* idq: 문구 수정 전 원문 → 기존 기록 유지 */ fam, rule, d, q, c: [a, b, c, e2], a: 0, e: ex }));
+  LQ.forEach((q, i) => { const e = QEN[i]; if (e) q.en = { q: e[0], c: [e[1], e[2], e[3], e[4]], e: e[5] }; });;
   { const seen = new Set(); LQ.forEach((q) => { if (seen.has(q.id)) throw new Error("dup question " + q.id); seen.add(q.id); }); }
   const LQ_BY_FAM = {}; LQ.forEach((q) => (LQ_BY_FAM[q.fam] = LQ_BY_FAM[q.fam] || []).push(q));
   const RULES = {}; STATES.forEach((s) => Object.entries(s.rules).forEach(([rid, text]) => (RULES[rid] = { id: rid, state: s.id, text })));
